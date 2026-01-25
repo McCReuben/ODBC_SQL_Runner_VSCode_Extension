@@ -12,6 +12,7 @@ export type ResultSetStatus = 'pending' | 'running' | 'complete' | 'error';
 export type ResultSet = {
   id: string;
   title: string; // "Result 1", "users table", etc.
+  sql?: string; // The specific SQL statement that generated this result set
   columns: Column[];
   rows: Array<Record<string, unknown>>;
   rowCount?: number;
@@ -37,12 +38,15 @@ export type QueryRun = {
 // App State
 // ============================================================================
 
+export type Theme = 'light' | 'dark';
+
 export type AppState = {
   runs: QueryRun[];
   activeRunId: string | null;
   activeResultSetId: string | null;
   // Selection aggregation computed from Tabulator
   selectionStats: SelectionStats | null;
+  theme: Theme;
 };
 
 export type SelectionStats = {
@@ -60,7 +64,7 @@ export type SelectionStats = {
 // Messages FROM extension TO webview
 export type ExtensionMessage =
   | { type: 'RUN_STARTED'; payload: { runId: string; sql: string; title: string; startedAt: number } }
-  | { type: 'RESULT_SET_STARTED'; payload: { runId: string; resultSetId: string; title: string; statementIndex?: number } }
+  | { type: 'RESULT_SET_STARTED'; payload: { runId: string; resultSetId: string; title: string; statementIndex?: number; sql?: string } }
   | { type: 'RESULT_SET_SCHEMA'; payload: { runId: string; resultSetId: string; columns: Column[] } }
   | { type: 'RESULT_SET_ROWS'; payload: { runId: string; resultSetId: string; rows: Array<Record<string, unknown>>; append: boolean } }
   | { type: 'RESULT_SET_COMPLETE'; payload: { runId: string; resultSetId: string; rowCount?: number; executionTimeMs?: number } }

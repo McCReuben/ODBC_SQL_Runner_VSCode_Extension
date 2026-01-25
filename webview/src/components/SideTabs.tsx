@@ -21,11 +21,6 @@ export function SideTabs({ results, activeResultSetId, onSelectResultSet }: Side
     );
   }
 
-  // Don't show side tabs if there's only one result
-  if (results.length === 1) {
-    return null;
-  }
-
   return (
     <div className="w-32 flex-shrink-0 border-r border-vscode-border bg-vscode-tab-inactive overflow-y-auto">
       {results.map((rs) => {

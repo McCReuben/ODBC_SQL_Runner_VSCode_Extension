@@ -1,22 +1,32 @@
-import type { ResultSet, SelectionStats } from '../types';
+import type { ResultSet, SelectionStats, Theme } from '../types';
 
 type StatusBarProps = {
   resultSet: ResultSet | null;
   selectionStats: SelectionStats | null;
+  queryTimestamp?: number;
+  theme: Theme;
+  onToggleTheme: () => void;
 };
 
 /**
  * Bottom status bar showing:
- * - Result set metadata (row count, execution time)
+ * - Result set metadata (query timestamp, row count, execution time)
  * - Selection aggregates (sum, avg, max) when numeric cells are selected
+ * - Settings gear icon for theme toggle
  */
-export function StatusBar({ resultSet, selectionStats }: StatusBarProps) {
+export function StatusBar({ resultSet, selectionStats, queryTimestamp, theme, onToggleTheme }: StatusBarProps) {
   return (
     <div className="h-6 flex items-center justify-between px-3 border-t border-vscode-border bg-vscode-tab-inactive text-[11px]">
       {/* Left side: Result set info */}
       <div className="flex items-center gap-4">
         {resultSet ? (
           <>
+            {queryTimestamp && (
+              <span>
+                <span className="text-gray-500">Executed:</span>{' '}
+                <span className="font-medium">{formatTimestamp(queryTimestamp)}</span>
+              </span>
+            )}
             {resultSet.status === 'running' && (
               <span className="text-yellow-400 flex items-center gap-1">
                 <span className="spinner w-3 h-3 border-2 border-yellow-400 border-t-transparent rounded-full" />
@@ -48,7 +58,7 @@ export function StatusBar({ resultSet, selectionStats }: StatusBarProps) {
         )}
       </div>
 
-      {/* Right side: Selection aggregates */}
+      {/* Right side: Selection aggregates & Settings */}
       <div className="flex items-center gap-4">
         {selectionStats ? (
           selectionStats.numericCellCount > 0 ? (
@@ -81,9 +91,37 @@ export function StatusBar({ resultSet, selectionStats }: StatusBarProps) {
         ) : (
           <span className="text-gray-500">Select cells to see aggregates</span>
         )}
+
+        {/* Theme toggle button */}
+        <button
+          onClick={onToggleTheme}
+          className="ml-2 p-1 rounded hover:bg-vscode-hover transition-colors"
+          title={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
+          aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 16 16"
+            fill="currentColor"
+            className="opacity-70 hover:opacity-100"
+          >
+            <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 13V2a6 6 0 1 1 0 12z" />
+          </svg>
+        </button>
       </div>
     </div>
   );
+}
+
+function formatTimestamp(timestamp: number): string {
+  const date = new Date(timestamp);
+  return date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
 }
 
 function formatDuration(ms: number): string {

@@ -1,0 +1,65 @@
+{
+  "name": "sql-runner-extension",
+  "displayName": "SQL Runner",
+  "description": "Execute SQL queries with Cmd+Enter and view results in an interactive table",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:sql"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "sqlRunner.executeQuery",
+        "title": "Execute SQL Query"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "sqlRunner.executeQuery",
+        "key": "cmd+enter",
+        "mac": "cmd+enter",
+        "win": "ctrl+enter",
+        "linux": "ctrl+enter",
+        "when": "editorTextFocus && editorLangId == sql"
+      }
+    ],
+    "configuration": {
+      "title": "SQL Runner",
+      "properties": {
+        "sqlRunner.odbcDsn": {
+          "type": "string",
+          "default": "Hermes",
+          "description": "ODBC DSN name for database connections"
+        },
+        "sqlRunner.pythonPath": {
+          "type": "string",
+          "default": "python3",
+          "description": "Path to Python executable (must have pyodbc and pandas installed)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^18.x",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "eslint": "^8.54.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {}
+}

@@ -22,7 +22,7 @@ export function TopTabs({ runs, activeRunId, onSelectRun, onCloseRun }: TopTabsP
 
   return (
     <div className="h-9 flex items-end border-b border-vscode-border bg-vscode-tab-inactive overflow-x-auto">
-      {runs.map((run) => {
+      {runs.slice().reverse().map((run) => {
         const isActive = run.id === activeRunId;
         return (
           <div
@@ -31,8 +31,8 @@ export function TopTabs({ runs, activeRunId, onSelectRun, onCloseRun }: TopTabsP
               tab-item group flex items-center gap-1 px-3 py-1.5 cursor-pointer
               border-r border-vscode-border select-none
               transition-colors duration-100
-              ${isActive 
-                ? 'bg-vscode-tab-active border-t-2 border-t-vscode-accent' 
+              ${isActive
+                ? 'bg-vscode-tab-active border-t-2 border-t-vscode-accent'
                 : 'bg-vscode-tab-inactive hover:bg-vscode-hover'
               }
             `}
@@ -40,12 +40,12 @@ export function TopTabs({ runs, activeRunId, onSelectRun, onCloseRun }: TopTabsP
           >
             {/* Status indicator */}
             <StatusIndicator status={run.status} />
-            
+
             {/* Tab title */}
             <span className="text-xs font-medium truncate max-w-[150px]">
               {run.title}
             </span>
-            
+
             {/* Close button */}
             <button
               className="tab-close-btn ml-1 p-0.5 rounded hover:bg-vscode-hover"

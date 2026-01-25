@@ -1,5 +1,5 @@
-import { useReducer, useEffect, useCallback } from 'react';
-import { TopTabs, SideTabs, ResultTable, StatusBar } from './components';
+import { useReducer, useEffect, useCallback, useState, useRef } from 'react';
+import { TopTabs, SideTabs, ResultTable, StatusBar, SqlModal, QueryToolbar, Toast, type ResultTableHandle } from './components';
 import { reducer, initialState, getActiveRun, getActiveResultSet } from './state';
 import { postMessage, notifyReady } from './vscode';
 import type { ExtensionMessage, SelectionStats } from './types';
@@ -22,9 +22,18 @@ import type { ExtensionMessage, SelectionStats } from './types';
  */
 export function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const [showSqlModal, setShowSqlModal] = useState(false);
+  const [showCopyToast, setShowCopyToast] = useState(false);
+  const resultTableRef = useRef<ResultTableHandle>(null);
 
   const activeRun = getActiveRun(state);
   const activeResultSet = getActiveResultSet(state);
+
+  // Apply theme class to root element
+  useEffect(() => {
+    const themeClass = `${state.theme}-theme`;
+    document.documentElement.className = themeClass;
+  }, [state.theme]);
 
   // Handle messages from VS Code extension
   useEffect(() => {
@@ -35,7 +44,7 @@ export function App() {
     };
 
     window.addEventListener('message', handleMessage);
-    
+
     // Notify extension that webview is ready
     notifyReady();
 
@@ -58,9 +67,9 @@ export function App() {
   const handleSelectResultSet = useCallback((resultSetId: string) => {
     dispatch({ type: 'SELECT_RESULT_SET', payload: { resultSetId } });
     if (state.activeRunId) {
-      postMessage({ 
-        type: 'USER_SELECTED_RESULTSET', 
-        payload: { runId: state.activeRunId, resultSetId } 
+      postMessage({
+        type: 'USER_SELECTED_RESULTSET',
+        payload: { runId: state.activeRunId, resultSetId }
       });
     }
   }, [state.activeRunId]);
@@ -68,6 +77,29 @@ export function App() {
   const handleSelectionChange = useCallback((stats: SelectionStats | null) => {
     dispatch({ type: 'UPDATE_SELECTION_STATS', payload: stats });
   }, []);
+
+  const handleCopyComplete = useCallback(() => {
+    setShowCopyToast(true);
+  }, []);
+
+  const handleCopyTable = useCallback(() => {
+    resultTableRef.current?.copyToClipboard();
+  }, []);
+
+  const handleToggleTheme = useCallback(() => {
+    dispatch({ type: 'TOGGLE_THEME' });
+  }, []);
+
+  // Handle ESC key to close modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showSqlModal) {
+        setShowSqlModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showSqlModal]);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-vscode-bg text-vscode-fg font-vscode">
@@ -80,7 +112,7 @@ export function App() {
       />
 
       {/* Middle: Side tabs + Table */}
-      <div className="flex-1 flex min-h-0">
+      <div className="flex-1 flex min-h-0 min-w-0">
         {/* Left: Result Set Tabs (vertical) */}
         {activeRun && (
           <SideTabs
@@ -90,18 +122,53 @@ export function App() {
           />
         )}
 
-        {/* Main: Table */}
-        <ResultTable
-          resultSet={activeResultSet}
-          onSelectionChange={handleSelectionChange}
-        />
+        {/* Right: Toolbar + Table */}
+        <div className="flex-1 flex flex-col min-h-0 min-w-0">
+          {/* Toolbar with View SQL button */}
+          {activeRun && activeResultSet && (
+            <QueryToolbar
+              queryTitle={activeResultSet.title || activeRun.title}
+              onShowSql={() => setShowSqlModal(true)}
+              onCopyTable={handleCopyTable}
+            />
+          )}
+
+          {/* Main: Table */}
+          <ResultTable
+            key={activeResultSet?.id ?? 'empty'}
+            ref={resultTableRef}
+            resultSet={activeResultSet}
+            onSelectionChange={handleSelectionChange}
+            onCopyComplete={handleCopyComplete}
+          />
+        </div>
       </div>
 
       {/* Bottom: Status Bar */}
       <StatusBar
         resultSet={activeResultSet}
         selectionStats={state.selectionStats}
+        queryTimestamp={activeRun?.startedAt}
+        theme={state.theme}
+        onToggleTheme={handleToggleTheme}
       />
+
+      {/* SQL Modal */}
+      {showSqlModal && activeRun && activeResultSet && (
+        <SqlModal
+          sql={activeResultSet.sql || activeRun.sql}
+          title={activeResultSet.title || activeRun.title}
+          onClose={() => setShowSqlModal(false)}
+        />
+      )}
+
+      {/* Copy Toast Notification */}
+      {showCopyToast && (
+        <Toast
+          message="Table copied to clipboard"
+          onClose={() => setShowCopyToast(false)}
+        />
+      )}
     </div>
   );
 }

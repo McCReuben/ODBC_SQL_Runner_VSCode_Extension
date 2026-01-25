@@ -1,0 +1,22 @@
+node_modules
+out
+dist
+*.vsix
+.vscode-test
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+env/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs
+webview/dist/
+webview/node_modules/

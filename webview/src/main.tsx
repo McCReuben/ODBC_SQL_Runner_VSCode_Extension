@@ -1,10 +1,10 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
-import './styles.css';
 
-// Import Tabulator styles
+// Import Tabulator styles first, then our custom styles will override
 import 'tabulator-tables/dist/css/tabulator_simple.min.css';
+import './styles.css';
 
 // Development mode: load mock data when not in VS Code
 if (import.meta.env.DEV) {

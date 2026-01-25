@@ -1,14 +1,27 @@
-import type { AppState, ExtensionMessage, QueryRun, ResultSet, SelectionStats } from './types';
+import type { AppState, ExtensionMessage, QueryRun, ResultSet, SelectionStats, Theme } from './types';
 
 // ============================================================================
 // Initial State
 // ============================================================================
+
+function getInitialTheme(): Theme {
+  try {
+    const saved = localStorage.getItem('tableAssetTheme');
+    if (saved === 'dark' || saved === 'light') {
+      return saved;
+    }
+  } catch (e) {
+    // Ignore localStorage errors
+  }
+  return 'light';
+}
 
 export const initialState: AppState = {
   runs: [],
   activeRunId: null,
   activeResultSetId: null,
   selectionStats: null,
+  theme: getInitialTheme(),
 };
 
 // ============================================================================
@@ -20,7 +33,8 @@ export type Action =
   | { type: 'SELECT_RUN'; payload: { runId: string } }
   | { type: 'SELECT_RESULT_SET'; payload: { resultSetId: string } }
   | { type: 'CLOSE_RUN'; payload: { runId: string } }
-  | { type: 'UPDATE_SELECTION_STATS'; payload: SelectionStats | null };
+  | { type: 'UPDATE_SELECTION_STATS'; payload: SelectionStats | null }
+  | { type: 'TOGGLE_THEME' };
 
 // ============================================================================
 // Reducer
@@ -76,6 +90,7 @@ export function reducer(state: AppState, action: Action): AppState {
       const newResultSet: ResultSet = {
         id: action.payload.resultSetId,
         title: action.payload.title,
+        sql: action.payload.sql, // Individual SQL statement for this result set
         columns: [],
         rows: [],
         statementIndex: action.payload.statementIndex,
@@ -206,6 +221,20 @@ export function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         selectionStats: action.payload,
+      };
+    }
+
+    case 'TOGGLE_THEME': {
+      const newTheme = state.theme === 'light' ? 'dark' : 'light';
+      // Persist theme preference to localStorage
+      try {
+        localStorage.setItem('tableAssetTheme', newTheme);
+      } catch (e) {
+        // Ignore localStorage errors
+      }
+      return {
+        ...state,
+        theme: newTheme,
       };
     }
 

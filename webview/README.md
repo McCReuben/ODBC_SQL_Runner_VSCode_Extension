@@ -124,7 +124,8 @@ panel.webview.postMessage({
     runId: 'unique-run-id',
     resultSetId: 'result-1',
     title: 'users',
-    statementIndex: 0
+    statementIndex: 0,
+    sql: 'SELECT * FROM users' // Optional: individual SQL statement for this result
   }
 });
 
@@ -219,7 +220,7 @@ panel.webview.onDidReceiveMessage(
 | Message Type | Payload | Description |
 |-------------|---------|-------------|
 | `RUN_STARTED` | `{ runId, sql, title, startedAt }` | New query execution started |
-| `RESULT_SET_STARTED` | `{ runId, resultSetId, title, statementIndex? }` | New result set starting |
+| `RESULT_SET_STARTED` | `{ runId, resultSetId, title, statementIndex?, sql? }` | New result set starting; `sql` is the individual statement |
 | `RESULT_SET_SCHEMA` | `{ runId, resultSetId, columns }` | Column definitions arrived |
 | `RESULT_SET_ROWS` | `{ runId, resultSetId, rows, append }` | Row data batch |
 | `RESULT_SET_COMPLETE` | `{ runId, resultSetId, rowCount?, executionTimeMs? }` | Result set finished |

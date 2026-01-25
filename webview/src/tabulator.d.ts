@@ -9,10 +9,11 @@ declare module 'tabulator-tables' {
     minWidth?: number;
     formatter?: string;
     formatterParams?: Record<string, unknown>;
+    getField?(): string;
   }
 
   export interface Range {
-    getCells(): Cell[];
+    getCells(): Cell[][];  // Returns 2D array: rows of cells
   }
 
   export interface Cell {
@@ -24,12 +25,13 @@ declare module 'tabulator-tables' {
   export interface Row {
     getData(): Record<string, unknown>;
     getIndex(): number;
+    getCell(field: string | ColumnDefinition): Cell;
   }
 
   export interface TabulatorOptions {
     data?: unknown[];
     columns?: ColumnDefinition[];
-    layout?: string;
+    layout?: "fitData" | "fitDataFill" | "fitDataTable" | "fitColumns";
     height?: string | number;
     movableColumns?: boolean;
     resizableColumns?: boolean;
@@ -39,10 +41,13 @@ declare module 'tabulator-tables' {
     selectableRangeClearCells?: boolean;
     clipboard?: boolean | string;
     clipboardCopyStyled?: boolean;
+    clipboardCopyRowRange?: string;
     clipboardCopyConfig?: {
       columnHeaders?: boolean;
       rowHeaders?: boolean;
     };
+    headerSortClickElement?: 'icon' | 'header';
+    renderHorizontal?: string; // "virtual" for virtual horizontal rendering
     initialSort?: Array<{ column: string; dir: 'asc' | 'desc' }>;
     renderVerticalBuffer?: number;
     placeholder?: string;
@@ -55,7 +60,10 @@ declare module 'tabulator-tables' {
     setData(data: unknown[]): Promise<void>;
     getData(): unknown[];
     getColumns(): ColumnDefinition[];
+    getRows(): Row[];
     getRanges(): Range[];
+    selectRow(rows?: Row | Row[]): void;
+    copyToClipboard(selector?: 'all' | 'selected' | 'active'): void;
     on(event: string, callback: (...args: unknown[]) => void): void;
     off(event: string, callback?: (...args: unknown[]) => void): void;
   }

@@ -11,6 +11,8 @@ import pyodbc
 import pandas as pd
 from typing import Optional, Dict, Any, List
 import time
+from decimal import Decimal
+from datetime import date, datetime, time as datetime_time
 
 
 class SqlExecutor:
@@ -83,7 +85,9 @@ class SqlExecutor:
                     value = row[i]
                     # Convert non-JSON-serializable types
                     if value is not None:
-                        if isinstance(value, (bytes, bytearray)):
+                        if isinstance(value, Decimal):
+                            value = float(value)
+                        elif isinstance(value, (bytes, bytearray)):
                             value = value.decode('utf-8', errors='replace')
                         elif hasattr(value, 'isoformat'):
                             value = value.isoformat()
@@ -229,9 +233,28 @@ def main():
             executor.close()
 
 
+class CustomJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles Decimal, datetime, and other non-serializable types"""
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            # Convert Decimal to float
+            return float(obj)
+        elif isinstance(obj, (datetime, date)):
+            # Convert datetime/date to ISO format string
+            return obj.isoformat()
+        elif isinstance(obj, datetime_time):
+            # Convert time to string
+            return obj.isoformat()
+        elif isinstance(obj, (bytes, bytearray)):
+            # Convert bytes to string
+            return obj.decode('utf-8', errors='replace')
+        # Let the base class raise TypeError for other types
+        return super().default(obj)
+
+
 def send_message(message: Dict[str, Any]):
     """Send a JSON message to stdout"""
-    sys.stdout.write(json.dumps(message) + "\n")
+    sys.stdout.write(json.dumps(message, cls=CustomJSONEncoder) + "\n")
     sys.stdout.flush()
 
 

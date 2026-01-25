@@ -39,6 +39,15 @@ export function App() {
   useEffect(() => {
     const handleMessage = (event: MessageEvent<ExtensionMessage>) => {
       const message = event.data;
+      
+      // DEBUG: Log received messages
+      if (message.type === 'RESULT_SET_SCHEMA' || message.type === 'RESULT_SET_ROWS') {
+        console.log("[DEBUG] App received message from extension:", {
+          type: message.type,
+          payload: message.payload
+        });
+      }
+      
       // All extension messages are handled by the reducer
       dispatch(message);
     };

@@ -122,7 +122,7 @@ class SqlExecutor:
         elif sql_type in (pyodbc.SQL_BIT,):
             return "boolean"
         elif sql_type in (pyodbc.SQL_TYPE_DATE, pyodbc.SQL_TYPE_TIME,
-                         pyodbc.SQL_TYPE_TIMESTAMP, pyodbc.SQL_DATETIME):
+                         pyodbc.SQL_TYPE_TIMESTAMP):
             return "date"
         else:
             return "string"
@@ -172,6 +172,14 @@ def main():
                     result_set_id = command.get("resultSetId", "")
 
                     result = executor.execute_query(sql, result_set_id)
+                    
+                    # DEBUG: Log the result before sending
+                    print(f"[DEBUG] Sending EXECUTE_RESULT for resultSetId={result_set_id}", file=sys.stderr)
+                    print(f"[DEBUG] Result success={result.get('success')}, hasResults={result.get('hasResults')}, rowCount={result.get('rowCount')}", file=sys.stderr)
+                    if result.get('columns'):
+                        print(f"[DEBUG] Columns: {[col['name'] for col in result['columns']]}", file=sys.stderr)
+                    print(f"[DEBUG] Full result keys: {list(result.keys())}", file=sys.stderr)
+                    
                     send_message({
                         "type": "EXECUTE_RESULT",
                         "payload": result

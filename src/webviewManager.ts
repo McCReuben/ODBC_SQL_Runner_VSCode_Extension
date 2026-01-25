@@ -115,6 +115,14 @@ export class WebviewManager {
     columns: Column[]
   ) {
     const panel = this.panels.get(fileUri);
+    console.log("[DEBUG] WebviewManager.sendResultSetSchema:", {
+      fileUri,
+      runId,
+      resultSetId,
+      columnsLength: columns.length,
+      columns,
+      panelExists: !!panel
+    });
     if (panel) {
       panel.webview.postMessage({
         type: 'RESULT_SET_SCHEMA',
@@ -138,6 +146,15 @@ export class WebviewManager {
     append: boolean = false
   ) {
     const panel = this.panels.get(fileUri);
+    console.log("[DEBUG] WebviewManager.sendResultSetRows:", {
+      fileUri,
+      runId,
+      resultSetId,
+      rowsLength: rows.length,
+      firstRow: rows[0],
+      append,
+      panelExists: !!panel
+    });
     if (panel) {
       panel.webview.postMessage({
         type: 'RESULT_SET_ROWS',

@@ -110,6 +110,12 @@ export function reducer(state: AppState, action: Action): AppState {
     }
 
     case 'RESULT_SET_SCHEMA': {
+      console.log("[DEBUG] Webview reducer: RESULT_SET_SCHEMA", {
+        runId: action.payload.runId,
+        resultSetId: action.payload.resultSetId,
+        columnsLength: action.payload.columns.length,
+        columns: action.payload.columns
+      });
       return {
         ...state,
         runs: updateResultSet(
@@ -122,6 +128,13 @@ export function reducer(state: AppState, action: Action): AppState {
     }
 
     case 'RESULT_SET_ROWS': {
+      console.log("[DEBUG] Webview reducer: RESULT_SET_ROWS", {
+        runId: action.payload.runId,
+        resultSetId: action.payload.resultSetId,
+        rowsLength: action.payload.rows.length,
+        append: action.payload.append,
+        firstRow: action.payload.rows[0]
+      });
       return {
         ...state,
         runs: updateResultSet(

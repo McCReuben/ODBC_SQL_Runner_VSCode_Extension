@@ -120,6 +120,16 @@ export class SqlExecutor {
                 // Execute the query
                 const result = await session.executeQuery(stmt.sql, resultSetId);
 
+                // DEBUG: Log the result received by SqlExecutor
+                console.log("[DEBUG] SqlExecutor received result:", {
+                  resultSetId,
+                  success: result.success,
+                  hasResults: result.hasResults,
+                  columnsLength: result.columns?.length,
+                  rowsLength: result.rows?.length,
+                  sql: stmt.sql.substring(0, 100)
+                });
+
                 if (!result.success) {
                   // Send error
                   this.webviewManager.sendResultSetError(
@@ -132,6 +142,9 @@ export class SqlExecutor {
                 }
 
                 if (result.hasResults && result.columns && result.rows) {
+                  console.log("[DEBUG] SqlExecutor: Query has results, sending schema and rows");
+                  console.log("[DEBUG] Columns:", result.columns);
+                  console.log("[DEBUG] First 2 rows:", result.rows.slice(0, 2));
                   // Send schema
                   this.webviewManager.sendResultSetSchema(
                     fileUri,
@@ -157,7 +170,9 @@ export class SqlExecutor {
                     result.rowCount || 0,
                     result.executionTimeMs || 0
                   );
+                  console.log("[DEBUG] SqlExecutor: Sent schema, rows, and complete messages");
                 } else {
+                  console.log("[DEBUG] SqlExecutor: Query has no results (DDL/DML)");
                   // DDL/DML query with no results
                   // Send a message as a "schema" with info
                   this.webviewManager.sendResultSetSchema(

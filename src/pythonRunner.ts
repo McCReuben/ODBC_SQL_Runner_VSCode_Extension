@@ -2,9 +2,9 @@
  * Manages Python child processes for SQL execution
  */
 
-import { spawn, ChildProcess } from 'child_process';
-import * as path from 'path';
-import * as vscode from 'vscode';
+import { spawn, ChildProcess } from "child_process";
+import * as path from "path";
+import * as vscode from "vscode";
 
 export interface PythonMessage {
   type: string;
@@ -31,15 +31,16 @@ export interface ExecuteResult {
 
 export class PythonRunner {
   private process: ChildProcess | null = null;
-  private messageHandlers: Map<string, (message: PythonMessage) => void> = new Map();
-  private outputBuffer = '';
+  private messageHandlers: Map<string, (message: PythonMessage) => void> =
+    new Map();
+  private outputBuffer = "";
   private isReady = false;
   private readyPromise: Promise<void>;
   private readyResolver!: () => void;
 
   constructor(
     private pythonPath: string,
-    private scriptPath: string
+    private scriptPath: string,
   ) {
     this.readyPromise = new Promise((resolve) => {
       this.readyResolver = resolve;
@@ -51,45 +52,44 @@ export class PythonRunner {
       try {
         // Spawn the Python process
         this.process = spawn(this.pythonPath, [this.scriptPath], {
-          stdio: ['pipe', 'pipe', 'pipe']
+          stdio: ["pipe", "pipe", "pipe"],
         });
 
         // Handle stdout (JSON messages)
-        this.process.stdout?.on('data', (data: Buffer) => {
+        this.process.stdout?.on("data", (data: Buffer) => {
           this.handleStdout(data);
         });
 
         // Handle stderr (logs/errors)
-        this.process.stderr?.on('data', (data: Buffer) => {
-          console.error('[Python stderr]:', data.toString());
+        this.process.stderr?.on("data", (data: Buffer) => {
+          console.error("[Python stderr]:", data.toString());
         });
 
         // Handle process exit
-        this.process.on('exit', (code) => {
+        this.process.on("exit", (code) => {
           console.log(`Python process exited with code ${code}`);
           this.isReady = false;
         });
 
         // Handle process errors
-        this.process.on('error', (error) => {
-          console.error('Python process error:', error);
+        this.process.on("error", (error) => {
+          console.error("Python process error:", error);
           reject(error);
         });
 
         // Wait for ready message
         this.readyPromise.then(() => {
           // Send connect command
-          this.sendCommand({ type: 'CONNECT', dsn })
+          this.sendCommand({ type: "CONNECT", dsn })
             .then((result) => {
               if (result.payload?.success) {
                 resolve();
               } else {
-                reject(new Error(result.payload?.error || 'Connection failed'));
+                reject(new Error(result.payload?.error || "Connection failed"));
               }
             })
             .catch(reject);
         });
-
       } catch (error) {
         reject(error);
       }
@@ -101,7 +101,7 @@ export class PythonRunner {
 
     // Process complete JSON messages (line by line)
     let newlineIndex: number;
-    while ((newlineIndex = this.outputBuffer.indexOf('\n')) !== -1) {
+    while ((newlineIndex = this.outputBuffer.indexOf("\n")) !== -1) {
       const line = this.outputBuffer.substring(0, newlineIndex).trim();
       this.outputBuffer = this.outputBuffer.substring(newlineIndex + 1);
 
@@ -113,17 +113,30 @@ export class PythonRunner {
         const message: PythonMessage = JSON.parse(line);
         this.handleMessage(message);
       } catch (error) {
-        console.error('Failed to parse JSON from Python:', line, error);
+        console.error("Failed to parse JSON from Python:", line, error);
       }
     }
   }
 
   private handleMessage(message: PythonMessage) {
     // Handle READY message
-    if (message.type === 'READY') {
+    if (message.type === "READY") {
       this.isReady = true;
       this.readyResolver();
       return;
+    }
+
+    // DEBUG: Log received message
+    if (message.type === "EXECUTE_RESULT") {
+      console.log("[DEBUG] PythonRunner received EXECUTE_RESULT:", {
+        type: message.type,
+        success: message.payload?.success,
+        hasResults: message.payload?.hasResults,
+        rowCount: message.payload?.rowCount,
+        columnsLength: message.payload?.columns?.length,
+        rowsLength: message.payload?.rows?.length,
+        payloadKeys: message.payload ? Object.keys(message.payload) : []
+      });
     }
 
     // Call registered handler
@@ -131,30 +144,33 @@ export class PythonRunner {
     if (handler) {
       handler(message);
       this.messageHandlers.delete(message.type);
+    } else {
+      console.log("[DEBUG] No handler registered for message type:", message.type);
     }
   }
 
   private sendCommand(command: any): Promise<PythonMessage> {
     return new Promise((resolve, reject) => {
       if (!this.process || !this.process.stdin) {
-        reject(new Error('Python process not started'));
+        reject(new Error("Python process not started"));
         return;
       }
 
       // Determine expected response type
       let responseType: string;
       switch (command.type) {
-        case 'CONNECT':
-          responseType = 'CONNECT_RESULT';
+        case "CONNECT":
+          responseType = "CONNECT_RESULT";
           break;
-        case 'EXECUTE':
-          responseType = 'EXECUTE_RESULT';
+        case "EXECUTE":
+          console.log("Sending EXECUTE command for SQL:", command.sql);
+          responseType = "EXECUTE_RESULT";
           break;
-        case 'CLOSE':
-          responseType = 'CLOSE_RESULT';
+        case "CLOSE":
+          responseType = "CLOSE_RESULT";
           break;
         default:
-          responseType = 'ERROR';
+          responseType = "ERROR";
       }
 
       // Register handler for response
@@ -164,7 +180,7 @@ export class PythonRunner {
 
       // Send command
       try {
-        this.process.stdin.write(JSON.stringify(command) + '\n');
+        this.process.stdin.write(JSON.stringify(command) + "\n");
       } catch (error) {
         this.messageHandlers.delete(responseType);
         reject(error);
@@ -176,9 +192,19 @@ export class PythonRunner {
     await this.readyPromise;
 
     const response = await this.sendCommand({
-      type: 'EXECUTE',
+      type: "EXECUTE",
       sql,
-      resultSetId
+      resultSetId,
+    });
+
+    // DEBUG: Log the parsed result
+    console.log("[DEBUG] PythonRunner.executeQuery returning result:", {
+      resultSetId,
+      success: response.payload?.success,
+      hasResults: response.payload?.hasResults,
+      columnsLength: response.payload?.columns?.length,
+      rowsLength: response.payload?.rows?.length,
+      payloadKeys: response.payload ? Object.keys(response.payload) : []
     });
 
     return response.payload as ExecuteResult;
@@ -186,7 +212,7 @@ export class PythonRunner {
 
   async close(): Promise<void> {
     if (this.process) {
-      await this.sendCommand({ type: 'CLOSE' });
+      await this.sendCommand({ type: "CLOSE" });
       this.process.kill();
       this.process = null;
     }
@@ -217,14 +243,14 @@ export class SessionManager {
     }
 
     // Create new session
-    const config = vscode.workspace.getConfiguration('sqlRunner');
-    const pythonPath = config.get<string>('pythonPath', 'python3');
-    const dsn = config.get<string>('odbcDsn', 'Hermes');
-    const useMock = config.get<boolean>('useMockDatabase', false);
+    const config = vscode.workspace.getConfiguration("sqlRunner");
+    const pythonPath = config.get<string>("pythonPath", "python3");
+    const dsn = config.get<string>("odbcDsn", "Hermes");
+    const useMock = config.get<boolean>("useMockDatabase", false);
 
     // Choose the correct Python script based on mock mode
-    const scriptName = useMock ? 'sql_executor_mock.py' : 'sql_executor.py';
-    const scriptPath = path.join(this.extensionPath, 'python', scriptName);
+    const scriptName = useMock ? "sql_executor_mock.py" : "sql_executor.py";
+    const scriptPath = path.join(this.extensionPath, "python", scriptName);
 
     session = new PythonRunner(pythonPath, scriptPath);
 
@@ -246,7 +272,9 @@ export class SessionManager {
   }
 
   async closeAllSessions(): Promise<void> {
-    const promises = Array.from(this.sessions.values()).map(session => session.close());
+    const promises = Array.from(this.sessions.values()).map((session) =>
+      session.close(),
+    );
     await Promise.all(promises);
     this.sessions.clear();
   }

@@ -1,0 +1,144 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================================
+   Base styles that integrate with VS Code theming
+   ============================================================================ */
+
+:root {
+  /* Fallback values for standalone development */
+  --vscode-editor-background: #1e1e1e;
+  --vscode-editor-foreground: #d4d4d4;
+  --vscode-panel-border: #3c3c3c;
+  --vscode-tab-activeBackground: #1e1e1e;
+  --vscode-tab-inactiveBackground: #2d2d2d;
+  --vscode-input-background: #3c3c3c;
+  --vscode-editor-selectionBackground: #264f78;
+  --vscode-list-hoverBackground: #2a2d2e;
+  --vscode-focusBorder: #007acc;
+  --vscode-font-size: 13px;
+  --vscode-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --vscode-editor-font-family: 'SF Mono', Menlo, Monaco, 'Courier New', monospace;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--vscode-editor-background);
+  color: var(--vscode-editor-foreground);
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  overflow: hidden;
+}
+
+/* ============================================================================
+   Tabulator Customization for VS Code Theme
+   ============================================================================ */
+
+.tabulator {
+  background-color: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
+}
+
+.tabulator .tabulator-header {
+  background-color: var(--vscode-tab-inactiveBackground);
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.tabulator .tabulator-header .tabulator-col {
+  background-color: transparent;
+  border-right: 1px solid var(--vscode-panel-border);
+}
+
+.tabulator .tabulator-header .tabulator-col .tabulator-col-content {
+  color: var(--vscode-editor-foreground);
+  padding: 6px 8px;
+}
+
+.tabulator .tabulator-header .tabulator-col.tabulator-sortable:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.tabulator .tabulator-tableholder {
+  background-color: var(--vscode-editor-background);
+}
+
+.tabulator .tabulator-row {
+  background-color: var(--vscode-editor-background);
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.tabulator .tabulator-row:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.tabulator .tabulator-row .tabulator-cell {
+  border-right: 1px solid var(--vscode-panel-border);
+  color: var(--vscode-editor-foreground);
+  padding: 4px 8px;
+}
+
+/* Selected cells - using VS Code selection color */
+.tabulator .tabulator-row .tabulator-cell.tabulator-selected {
+  background-color: var(--vscode-editor-selectionBackground);
+}
+
+.tabulator .tabulator-row.tabulator-selected {
+  background-color: var(--vscode-editor-selectionBackground);
+}
+
+/* Range selection highlight */
+.tabulator .tabulator-row .tabulator-cell.tabulator-range-selected {
+  background-color: var(--vscode-editor-selectionBackground);
+}
+
+/* Sort arrow styling */
+.tabulator .tabulator-header .tabulator-col.tabulator-sortable .tabulator-col-sorter {
+  color: var(--vscode-editor-foreground);
+}
+
+/* Scrollbar styling for VS Code look */
+.tabulator .tabulator-tableholder::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.tabulator .tabulator-tableholder::-webkit-scrollbar-track {
+  background: var(--vscode-editor-background);
+}
+
+.tabulator .tabulator-tableholder::-webkit-scrollbar-thumb {
+  background: var(--vscode-input-background);
+  border-radius: 5px;
+}
+
+.tabulator .tabulator-tableholder::-webkit-scrollbar-thumb:hover {
+  background: var(--vscode-panel-border);
+}
+
+/* ============================================================================
+   Custom utility classes
+   ============================================================================ */
+
+.tab-close-btn {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.tab-item:hover .tab-close-btn {
+  opacity: 1;
+}
+
+/* Spinner animation */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}

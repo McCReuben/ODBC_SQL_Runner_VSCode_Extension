@@ -1,2 +1,6 @@
+# For ODBC mode (sql_executor.py)
 pyodbc>=4.0.39
 pandas>=2.0.0
+
+# For Mock mode (sql_executor_mock.py)
+# sqlite3 is included in Python standard library - no installation needed

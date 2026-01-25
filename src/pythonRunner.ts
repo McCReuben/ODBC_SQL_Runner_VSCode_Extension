@@ -220,8 +220,11 @@ export class SessionManager {
     const config = vscode.workspace.getConfiguration('sqlRunner');
     const pythonPath = config.get<string>('pythonPath', 'python3');
     const dsn = config.get<string>('odbcDsn', 'Hermes');
+    const useMock = config.get<boolean>('useMockDatabase', false);
 
-    const scriptPath = path.join(this.extensionPath, 'python', 'sql_executor.py');
+    // Choose the correct Python script based on mock mode
+    const scriptName = useMock ? 'sql_executor_mock.py' : 'sql_executor.py';
+    const scriptPath = path.join(this.extensionPath, 'python', scriptName);
 
     session = new PythonRunner(pythonPath, scriptPath);
 

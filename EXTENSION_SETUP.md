@@ -5,8 +5,40 @@ A VS Code extension for executing SQL queries via ODBC and displaying results in
 ## Prerequisites
 
 1. **Node.js** (v18 or later)
-2. **Python 3** with `pyodbc` and `pandas`
-3. **ODBC Driver** configured with a DSN (e.g., "Hermes")
+2. **Python 3** (standard library includes `sqlite3`)
+3. **For ODBC mode**: `pyodbc` and `pandas` + configured ODBC DSN
+
+## Mock Database Mode (Recommended for Testing)
+
+The extension includes a mock SQLite database mode that requires no ODBC setup. This is perfect for:
+- Testing the extension without configuring ODBC
+- Development and debugging
+- Demonstrations
+- Learning SQL
+
+### Enabling Mock Mode
+
+Add to your settings (`.vscode/settings.json` or VS Code Settings UI):
+
+```json
+{
+  "sqlRunner.useMockDatabase": true
+}
+```
+
+### Sample Data Included
+
+The mock database automatically creates these tables:
+
+| Table | Columns | Description |
+|-------|---------|-------------|
+| `people` | id, name, age, email, department | Employee data (10 rows) |
+| `products` | id, name, category, price, stock | Product catalog (10 rows) |
+| `sales` | id, product_id, quantity, sale_date, revenue | Sales transactions (10 rows) |
+| `DW_SITES` | site_id, site_name, region, active | Site information (5 rows) |
+| `active_sites` | (view) | View of active sites only |
+
+See [examples/test_mock.sql](examples/test_mock.sql) for ready-to-run examples.
 
 ## Installation Steps
 
@@ -66,11 +98,12 @@ npm run watch
 
 ### Configuration
 
-Set your ODBC DSN in VS Code settings:
+Configure the extension in VS Code settings:
 
 1. Open Settings (Cmd+, or Ctrl+,)
 2. Search for "SQL Runner"
 3. Configure:
+   - **SQL Runner: Use Mock Database** - Use SQLite mock instead of ODBC (default: false)
    - **SQL Runner: ODBC DSN** - Your ODBC Data Source Name (default: "Hermes")
    - **SQL Runner: Python Path** - Path to Python executable (default: "python3")
 
@@ -78,10 +111,13 @@ Or edit `.vscode/settings.json`:
 
 ```json
 {
+  "sqlRunner.useMockDatabase": false,
   "sqlRunner.odbcDsn": "Hermes",
   "sqlRunner.pythonPath": "/usr/local/bin/python3"
 }
 ```
+
+**Quick Start**: Set `"useMockDatabase": true` to test without ODBC setup!
 
 ## Usage
 
@@ -133,6 +169,7 @@ The results panel includes:
 ### "Python process not started" Error
 
 **Solution**: Check your Python path in settings
+
 ```bash
 which python3  # Use this path in settings
 ```
@@ -140,6 +177,7 @@ which python3  # Use this path in settings
 ### "Connection failed" or ODBC Errors
 
 **Solution**: Verify your ODBC DSN configuration
+
 ```bash
 # On macOS, check ODBC configuration
 cat /Library/ODBC/odbc.ini
@@ -151,6 +189,7 @@ python3 -c "import pyodbc; conn = pyodbc.connect('DSN=Hermes'); print('Success')
 ### "Webview not built" Error
 
 **Solution**: Build the webview assets
+
 ```bash
 cd webview
 npm install
@@ -160,6 +199,7 @@ npm run build
 ### No Results Showing
 
 **Solution**: Check the Debug Console in the Extension Development Host
+
 1. View → Debug Console
 2. Look for Python stderr or error messages
 

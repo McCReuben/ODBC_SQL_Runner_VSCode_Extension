@@ -42,6 +42,11 @@
           "type": "string",
           "default": "python3",
           "description": "Path to Python executable (must have pyodbc and pandas installed)"
+        },
+        "sqlRunner.useMockDatabase": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use in-memory SQLite mock database instead of ODBC (useful for testing without ODBC setup)"
         }
       }
     }

@@ -2,6 +2,51 @@
 
 Get up and running with the SQL Runner extension in 5 minutes.
 
+## Option A: Quick Test with Mock Database (No ODBC Required)
+
+Skip ODBC setup and test immediately with an in-memory SQLite database.
+
+### Step 1: Build the Project
+
+```bash
+# Install extension dependencies
+npm install
+
+# Build the webview
+cd webview
+npm install
+npm run build
+cd ..
+
+# Compile the extension
+npm run compile
+```
+
+### Step 2: Enable Mock Mode
+
+Create or edit `.vscode/settings.json`:
+
+```json
+{
+  "sqlRunner.useMockDatabase": true
+}
+```
+
+### Step 3: Launch and Test
+
+1. Press **F5** to launch Extension Development Host
+2. Open `examples/test_mock.sql` in the new window
+3. Press **Cmd+Enter** on any query
+4. Results appear instantly with pre-populated sample data!
+
+The mock database includes sample tables: `people`, `products`, `sales`, and `DW_SITES`.
+
+---
+
+## Option B: Full Setup with ODBC Connection
+
+For production use with your actual database.
+
 ## Step 1: Install Python Dependencies
 
 ```bash

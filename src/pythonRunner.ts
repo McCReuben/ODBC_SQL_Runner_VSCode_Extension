@@ -139,6 +139,13 @@ export class PythonRunner {
       });
     }
 
+    if (message.type === "ERROR") {
+      console.log("[DEBUG] PythonRunner received ERROR:", {
+        type: message.type,
+        payload: message.payload
+      });
+    }
+
     // Call registered handler
     const handler = this.messageHandlers.get(message.type);
     if (handler) {
@@ -146,6 +153,8 @@ export class PythonRunner {
       this.messageHandlers.delete(message.type);
     } else {
       console.log("[DEBUG] No handler registered for message type:", message.type);
+      console.log("[DEBUG] Full message:", JSON.stringify(message, null, 2));
+      console.log("[DEBUG] Registered handlers:", Array.from(this.messageHandlers.keys()));
     }
   }
 
@@ -173,16 +182,25 @@ export class PythonRunner {
           responseType = "ERROR";
       }
 
-      // Register handler for response
+      // Register handler for expected response
       this.messageHandlers.set(responseType, (message) => {
+        this.messageHandlers.delete("ERROR"); // Clean up error handler
         resolve(message);
       });
+
+      // Also register handler for ERROR in case something goes wrong
+      const errorHandler = (message: PythonMessage) => {
+        this.messageHandlers.delete(responseType); // Clean up success handler
+        reject(new Error(`Python error: ${JSON.stringify(message.payload)}`));
+      };
+      this.messageHandlers.set("ERROR", errorHandler);
 
       // Send command
       try {
         this.process.stdin.write(JSON.stringify(command) + "\n");
       } catch (error) {
         this.messageHandlers.delete(responseType);
+        this.messageHandlers.delete("ERROR");
         reject(error);
       }
     });

@@ -203,18 +203,24 @@ def main():
                     })
 
             except json.JSONDecodeError as e:
+                error_msg = f"Invalid JSON: {str(e)}"
+                print(f"[DEBUG] JSON decode error: {error_msg}", file=sys.stderr)
                 send_message({
                     "type": "ERROR",
                     "payload": {
-                        "error": f"Invalid JSON: {str(e)}"
+                        "error": error_msg
                     }
                 })
             except Exception as e:
+                error_msg = str(e)
+                tb = traceback.format_exc()
+                print(f"[DEBUG] Exception in main loop: {error_msg}", file=sys.stderr)
+                print(f"[DEBUG] Traceback:\n{tb}", file=sys.stderr)
                 send_message({
                     "type": "ERROR",
                     "payload": {
-                        "error": str(e),
-                        "traceback": traceback.format_exc()
+                        "error": error_msg,
+                        "traceback": tb
                     }
                 })
 

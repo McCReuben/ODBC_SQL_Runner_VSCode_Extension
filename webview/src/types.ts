@@ -64,6 +64,7 @@ export type SelectionStats = {
 // Messages FROM extension TO webview
 export type ExtensionMessage =
   | { type: 'RUN_STARTED'; payload: { runId: string; sql: string; title: string; startedAt: number } }
+  | { type: 'RESULT_SET_PENDING'; payload: { runId: string; resultSetId: string; title: string; statementIndex?: number; sql?: string } }
   | { type: 'RESULT_SET_STARTED'; payload: { runId: string; resultSetId: string; title: string; statementIndex?: number; sql?: string } }
   | { type: 'RESULT_SET_SCHEMA'; payload: { runId: string; resultSetId: string; columns: Column[] } }
   | { type: 'RESULT_SET_ROWS'; payload: { runId: string; resultSetId: string; rows: Array<Record<string, unknown>>; append: boolean } }

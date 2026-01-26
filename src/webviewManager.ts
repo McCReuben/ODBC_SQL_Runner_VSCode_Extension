@@ -101,7 +101,33 @@ export class WebviewManager {
   }
 
   /**
-   * Send RESULT_SET_STARTED message
+   * Send RESULT_SET_PENDING message (creates a tab in pending state)
+   */
+  sendResultSetPending(
+    fileUri: string,
+    runId: string,
+    resultSetId: string,
+    title: string,
+    statementIndex: number,
+    sql?: string
+  ) {
+    const panel = this.panels.get(fileUri);
+    if (panel) {
+      panel.webview.postMessage({
+        type: 'RESULT_SET_PENDING',
+        payload: {
+          runId,
+          resultSetId,
+          title,
+          statementIndex,
+          sql
+        }
+      });
+    }
+  }
+
+  /**
+   * Send RESULT_SET_STARTED message (changes status from pending to running)
    */
   sendResultSetStarted(
     fileUri: string,

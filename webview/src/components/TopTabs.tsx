@@ -39,7 +39,7 @@ export function TopTabs({ runs, activeRunId, onSelectRun, onCloseRun }: TopTabsP
             onClick={() => onSelectRun(run.id)}
           >
             {/* Status indicator */}
-            <StatusIndicator status={run.status} />
+            <StatusIndicator run={run} />
 
             {/* Tab title */}
             <span className="text-xs font-medium truncate max-w-[150px]">
@@ -64,13 +64,27 @@ export function TopTabs({ runs, activeRunId, onSelectRun, onCloseRun }: TopTabsP
   );
 }
 
-function StatusIndicator({ status }: { status: QueryRun['status'] }) {
-  if (status === 'running') {
+function StatusIndicator({ run }: { run: QueryRun }) {
+  if (run.status === 'running') {
+    // Check if all result sets are pending (waiting for execution)
+    const hasOnlyPendingQueries = run.results.length > 0 && run.results.every(rs => rs.status === 'pending');
+    
+    if (hasOnlyPendingQueries) {
+      // All queries are pending (waiting)
+      return (
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" className="text-gray-400">
+          <title>Waiting</title>
+          <path d="M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1zm0 1a6 6 0 1 0 0 12A6 6 0 0 0 8 2zM6 5v6h1V5H6zm3 0v6h1V5H9z" />
+        </svg>
+      );
+    }
+    
+    // At least one query is actively running
     return (
       <span className="spinner w-3 h-3 border-2 border-vscode-accent border-t-transparent rounded-full" />
     );
   }
-  if (status === 'error') {
+  if (run.status === 'error') {
     return (
       <span className="w-2 h-2 rounded-full bg-red-500" title="Error" />
     );

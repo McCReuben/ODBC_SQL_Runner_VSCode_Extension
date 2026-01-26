@@ -47,6 +47,11 @@ export function SideTabs({ results, activeResultSetId, onSelectResultSet }: Side
               <div className="text-xs font-medium truncate">
                 {rs.title}
               </div>
+              {rs.status === 'pending' && (
+                <div className="text-[10px] text-gray-500 truncate">
+                  Waiting...
+                </div>
+              )}
               {rs.status === 'complete' && rs.rowCount !== undefined && (
                 <div className="text-[10px] text-gray-500">
                   {rs.rowCount.toLocaleString()} rows
@@ -71,7 +76,15 @@ export function SideTabs({ results, activeResultSetId, onSelectResultSet }: Side
 }
 
 function ResultStatusIndicator({ status }: { status: ResultSet['status'] }) {
-  if (status === 'running' || status === 'pending') {
+  if (status === 'pending') {
+    return (
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" className="text-gray-400 flex-shrink-0">
+        <title>Waiting</title>
+        <path d="M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1zm0 1a6 6 0 1 0 0 12A6 6 0 0 0 8 2zM6 5v6h1V5H6zm3 0v6h1V5H9z" />
+      </svg>
+    );
+  }
+  if (status === 'running') {
     return (
       <span className="spinner w-3 h-3 border-2 border-vscode-accent border-t-transparent rounded-full flex-shrink-0" />
     );

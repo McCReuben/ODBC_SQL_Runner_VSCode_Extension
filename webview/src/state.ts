@@ -102,7 +102,7 @@ export function reducer(state: AppState, action: Action): AppState {
     // -------------------------------------------------------------------------
     // Result set lifecycle
     // -------------------------------------------------------------------------
-    case 'RESULT_SET_STARTED': {
+    case 'RESULT_SET_PENDING': {
       const newResultSet: ResultSet = {
         id: action.payload.resultSetId,
         title: action.payload.title,
@@ -110,7 +110,7 @@ export function reducer(state: AppState, action: Action): AppState {
         columns: [],
         rows: [],
         statementIndex: action.payload.statementIndex,
-        status: 'running',
+        status: 'pending',
       };
       const updatedRuns = updateRun(state.runs, action.payload.runId, (run) => ({
         ...run,
@@ -122,6 +122,19 @@ export function reducer(state: AppState, action: Action): AppState {
         ...state,
         runs: updatedRuns,
         activeResultSetId: shouldSelect ? newResultSet.id : state.activeResultSetId,
+      };
+    }
+
+    case 'RESULT_SET_STARTED': {
+      // Update existing result set from 'pending' to 'running'
+      return {
+        ...state,
+        runs: updateResultSet(
+          state.runs,
+          action.payload.runId,
+          action.payload.resultSetId,
+          (rs) => ({ ...rs, status: 'running' })
+        ),
       };
     }
 

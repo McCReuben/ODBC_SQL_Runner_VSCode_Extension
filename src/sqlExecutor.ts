@@ -125,10 +125,36 @@ export class SqlExecutor {
               `Query ${this.queryCounter}`,
             );
 
-            // Execute each statement
+            // Send RESULT_SET_PENDING for all statements upfront to create tabs immediately
             for (let i = 0; i < statements.length; i++) {
               const stmt = statements[i];
               const resultSetId = `${runId}-rs-${i}`;
+              this.webviewManager.sendResultSetPending(
+                fileUri,
+                runId,
+                resultSetId,
+                `Result ${i + 1}`,
+                i,
+                stmt.sql,
+              );
+            }
+
+            // Execute each statement
+            let batchFailed = false;
+            for (let i = 0; i < statements.length; i++) {
+              const stmt = statements[i];
+              const resultSetId = `${runId}-rs-${i}`;
+
+              // If a previous query in this batch failed, cancel this one
+              if (batchFailed) {
+                // Just send CANCELLED - tab already exists from RESULT_SET_PENDING
+                this.webviewManager.sendResultSetCancelled(
+                  fileUri,
+                  runId,
+                  resultSetId,
+                );
+                continue;
+              }
 
               // Track this result set as running
               this.runningResultSets.get(runId)?.add(resultSetId);
@@ -137,21 +163,23 @@ export class SqlExecutor {
                 message: `Executing statement ${i + 1} of ${statements.length}...`,
               });
 
-              // Send RESULT_SET_STARTED
-              this.webviewManager.sendResultSetStarted(
-                fileUri,
-                runId,
-                resultSetId,
-                `Result ${i + 1}`,
-                i,
-                stmt.sql,
-              );
-
               try {
-                // Execute the query
+                // Execute the query with onStarted callback
+                // The callback will be invoked when the query actually starts (not just queued)
                 const result = await session.executeQuery(
                   stmt.sql,
                   resultSetId,
+                  () => {
+                    // Send RESULT_SET_STARTED when query actually begins executing
+                    this.webviewManager.sendResultSetStarted(
+                      fileUri,
+                      runId,
+                      resultSetId,
+                      `Result ${i + 1}`,
+                      i,
+                      stmt.sql,
+                    );
+                  }
                 );
 
                 // DEBUG: Log the result received by SqlExecutor
@@ -174,6 +202,9 @@ export class SqlExecutor {
                   );
                   // Remove from running result sets
                   this.runningResultSets.get(runId)?.delete(resultSetId);
+                  
+                  // Mark batch as failed - downstream queries in this batch will be cancelled
+                  batchFailed = true;
                   continue;
                 }
 
@@ -258,15 +289,24 @@ export class SqlExecutor {
                 );
                 // Remove from running result sets
                 this.runningResultSets.get(runId)?.delete(resultSetId);
+                
+                // Mark batch as failed - downstream queries in this batch will be cancelled
+                batchFailed = true;
               }
             }
 
             // Send RUN_COMPLETE
             this.webviewManager.sendRunComplete(fileUri, runId);
 
-            vscode.window.showInformationMessage(
-              `Executed ${statements.length} statement${statements.length > 1 ? "s" : ""}`,
-            );
+            if (batchFailed) {
+              vscode.window.showWarningMessage(
+                `Batch execution stopped due to error. Some downstream queries were cancelled.`,
+              );
+            } else {
+              vscode.window.showInformationMessage(
+                `Executed ${statements.length} statement${statements.length > 1 ? "s" : ""}`,
+              );
+            }
           } catch (error: any) {
             // Send RUN_ERROR
             this.webviewManager.sendRunError(

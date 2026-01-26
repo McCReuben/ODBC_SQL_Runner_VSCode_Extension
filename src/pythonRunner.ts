@@ -29,6 +29,14 @@ export interface ExecuteResult {
   traceback?: string;
 }
 
+interface QueuedQuery {
+  sql: string;
+  resultSetId: string;
+  resolve: (result: ExecuteResult) => void;
+  reject: (error: Error) => void;
+  onStarted?: () => void;
+}
+
 export class PythonRunner {
   private process: ChildProcess | null = null;
   private messageHandlers: Map<string, (message: PythonMessage) => void> =
@@ -37,6 +45,10 @@ export class PythonRunner {
   private isReady = false;
   private readyPromise: Promise<void>;
   private readyResolver!: () => void;
+  
+  // Query queue for sequential execution
+  private queryQueue: QueuedQuery[] = [];
+  private isExecutingQuery = false;
 
   constructor(
     private pythonPath: string,
@@ -206,26 +218,92 @@ export class PythonRunner {
     });
   }
 
-  async executeQuery(sql: string, resultSetId: string): Promise<ExecuteResult> {
+  /**
+   * Execute a query, queuing it if another query is already running.
+   * This ensures sequential execution within a session.
+   * @param onStarted - Optional callback invoked when query actually starts executing (not just queued)
+   */
+  async executeQuery(
+    sql: string, 
+    resultSetId: string,
+    onStarted?: () => void
+  ): Promise<ExecuteResult> {
     await this.readyPromise;
 
-    const response = await this.sendCommand({
-      type: "EXECUTE",
-      sql,
-      resultSetId,
+    return new Promise((resolve, reject) => {
+      // Add to queue
+      this.queryQueue.push({ sql, resultSetId, resolve, reject, onStarted });
+      
+      // Process queue if not already processing
+      this.processQueryQueue();
     });
+  }
 
-    // DEBUG: Log the parsed result
-    console.log("[DEBUG] PythonRunner.executeQuery returning result:", {
-      resultSetId,
-      success: response.payload?.success,
-      hasResults: response.payload?.hasResults,
-      columnsLength: response.payload?.columns?.length,
-      rowsLength: response.payload?.rows?.length,
-      payloadKeys: response.payload ? Object.keys(response.payload) : []
+  /**
+   * Process the query queue sequentially
+   */
+  private async processQueryQueue(): Promise<void> {
+    // If already executing a query, don't start another
+    if (this.isExecutingQuery) {
+      return;
+    }
+
+    // Get next query from queue
+    const query = this.queryQueue.shift();
+    if (!query) {
+      return;
+    }
+
+    this.isExecutingQuery = true;
+
+    try {
+      // Call onStarted callback before actually executing
+      // This signals that the query has moved from pending to running
+      if (query.onStarted) {
+        query.onStarted();
+      }
+
+      const response = await this.sendCommand({
+        type: "EXECUTE",
+        sql: query.sql,
+        resultSetId: query.resultSetId,
+      });
+
+      // DEBUG: Log the parsed result
+      console.log("[DEBUG] PythonRunner.executeQuery returning result:", {
+        resultSetId: query.resultSetId,
+        success: response.payload?.success,
+        hasResults: response.payload?.hasResults,
+        columnsLength: response.payload?.columns?.length,
+        rowsLength: response.payload?.rows?.length,
+        payloadKeys: response.payload ? Object.keys(response.payload) : []
+      });
+
+      query.resolve(response.payload as ExecuteResult);
+    } catch (error: any) {
+      query.reject(error);
+    } finally {
+      this.isExecutingQuery = false;
+      
+      // Process next query in queue
+      this.processQueryQueue();
+    }
+  }
+
+  /**
+   * Clear any pending queries from the queue
+   * Used when cancelling a batch - allows clearing queries that haven't started yet
+   */
+  clearPendingQueries(resultSetIds: string[]): void {
+    const idsToCancel = new Set(resultSetIds);
+    this.queryQueue = this.queryQueue.filter((query) => {
+      if (idsToCancel.has(query.resultSetId)) {
+        // Reject with a cancellation error
+        query.reject(new Error("Query cancelled"));
+        return false;
+      }
+      return true;
     });
-
-    return response.payload as ExecuteResult;
   }
 
   async close(): Promise<void> {
@@ -241,6 +319,13 @@ export class PythonRunner {
    * This will terminate any running query and lose session state
    */
   cancel(): void {
+    // Clear all pending queries from the queue
+    for (const query of this.queryQueue) {
+      query.reject(new Error("Query cancelled - session terminated"));
+    }
+    this.queryQueue = [];
+    this.isExecutingQuery = false;
+
     if (this.process) {
       console.log("[PythonRunner] Cancelling query by killing process");
       this.process.kill("SIGTERM");

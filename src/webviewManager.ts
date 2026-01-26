@@ -78,6 +78,45 @@ export class WebviewManager {
   }
 
   /**
+   * Send CONNECTION_STARTED message
+   */
+  sendConnectionStarted(fileUri: string) {
+    const panel = this.panels.get(fileUri);
+    if (panel) {
+      panel.webview.postMessage({
+        type: 'CONNECTION_STARTED',
+        payload: {}
+      });
+    }
+  }
+
+  /**
+   * Send CONNECTION_SUCCESS message
+   */
+  sendConnectionSuccess(fileUri: string, message?: string) {
+    const panel = this.panels.get(fileUri);
+    if (panel) {
+      panel.webview.postMessage({
+        type: 'CONNECTION_SUCCESS',
+        payload: { message }
+      });
+    }
+  }
+
+  /**
+   * Send CONNECTION_ERROR message
+   */
+  sendConnectionError(fileUri: string, message: string) {
+    const panel = this.panels.get(fileUri);
+    if (panel) {
+      panel.webview.postMessage({
+        type: 'CONNECTION_ERROR',
+        payload: { message }
+      });
+    }
+  }
+
+  /**
    * Send RUN_STARTED message
    */
   sendRunStarted(

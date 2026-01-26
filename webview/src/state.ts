@@ -22,6 +22,8 @@ export const initialState: AppState = {
   activeResultSetId: null,
   selectionStats: null,
   theme: getInitialTheme(),
+  connectionStatus: 'idle',
+  connectionError: undefined,
 };
 
 // ============================================================================
@@ -42,6 +44,33 @@ export type Action =
 
 export function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
+    // -------------------------------------------------------------------------
+    // Connection lifecycle
+    // -------------------------------------------------------------------------
+    case 'CONNECTION_STARTED': {
+      return {
+        ...state,
+        connectionStatus: 'connecting',
+        connectionError: undefined,
+      };
+    }
+
+    case 'CONNECTION_SUCCESS': {
+      return {
+        ...state,
+        connectionStatus: 'connected',
+        connectionError: undefined,
+      };
+    }
+
+    case 'CONNECTION_ERROR': {
+      return {
+        ...state,
+        connectionStatus: 'error',
+        connectionError: action.payload.message,
+      };
+    }
+
     // -------------------------------------------------------------------------
     // Run lifecycle
     // -------------------------------------------------------------------------

@@ -25,6 +25,11 @@ class SqlExecutorMock:
             self.connection = sqlite3.connect(":memory:")
             self.connection.row_factory = sqlite3.Row  # Enable column access by name
             self.cursor = self.connection.cursor()
+            
+            # Simulate slow connection (for testing)
+            print("Pausing for 5 seconds to simulate slow connection", flush=True)
+            time.sleep(5)
+            print("Connection established", flush=True)
 
             # Create sample tables
             self._create_sample_data()

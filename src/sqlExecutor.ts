@@ -67,7 +67,10 @@ export class SqlExecutor {
       // Get selection or cursor position
       const selection = editor.selection;
       const selectionInfo = selection.isEmpty
-        ? null
+        ? {
+            start: editor.document.offsetAt(selection.start),
+            end: editor.document.offsetAt(selection.start),
+          }
         : {
             start: editor.document.offsetAt(selection.start),
             end: editor.document.offsetAt(selection.end),
@@ -91,20 +94,30 @@ export class SqlExecutor {
       this.runningQueries.set(runId, fileUri);
       this.runningResultSets.set(runId, new Set());
 
+      // Get or create webview panel FIRST (before establishing connection)
+      const panel = this.webviewManager.getOrCreatePanel(fileUri, fileName);
+
       // Get or create session for this file
       let session;
       try {
+        // Notify webview that connection is starting
+        this.webviewManager.sendConnectionStarted(fileUri);
+        
         session = await this.sessionManager.getOrCreateSession(fileUri);
+        
+        // Notify webview that connection succeeded
+        this.webviewManager.sendConnectionSuccess(fileUri);
       } catch (error: any) {
         this.runningQueries.delete(runId);
+        
+        // Notify webview of connection error
+        this.webviewManager.sendConnectionError(fileUri, error.message);
+        
         vscode.window.showErrorMessage(
           `Failed to create database session: ${error.message}`,
         );
         return;
       }
-
-      // Get or create webview panel
-      const panel = this.webviewManager.getOrCreatePanel(fileUri, fileName);
 
       // Show progress
       await vscode.window.withProgress(

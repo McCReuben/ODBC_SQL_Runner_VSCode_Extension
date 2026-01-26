@@ -122,6 +122,9 @@ export function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showSqlModal]);
 
+  // Show connection status overlay if connecting or error
+  const showConnectionOverlay = state.connectionStatus === 'connecting' || state.connectionStatus === 'error';
+
   return (
     <div className="h-screen w-screen flex flex-col bg-vscode-bg text-vscode-fg font-vscode">
       {/* Top: Query History Tabs */}
@@ -133,7 +136,42 @@ export function App() {
       />
 
       {/* Middle: Side tabs + Table */}
-      <div className="flex-1 flex min-h-0 min-w-0">
+      <div className="flex-1 flex min-h-0 min-w-0 relative">
+        {/* Connection Status Overlay */}
+        {showConnectionOverlay && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-vscode-bg">
+            <div className="text-center p-8 max-w-md">
+              {state.connectionStatus === 'connecting' && (
+                <>
+                  <div className="mb-4">
+                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-vscode-fg"></div>
+                  </div>
+                  <h2 className="text-xl font-semibold mb-2">Connecting to Database...</h2>
+                  <p className="text-vscode-descriptionFg">
+                    Establishing connection. This may take a moment.
+                  </p>
+                </>
+              )}
+              {state.connectionStatus === 'error' && (
+                <>
+                  <div className="mb-4 text-red-500">
+                    <svg className="inline-block h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-xl font-semibold mb-2 text-red-500">Connection Failed</h2>
+                  <p className="text-vscode-fg mb-4">
+                    {state.connectionError || 'Failed to connect to the database'}
+                  </p>
+                  <p className="text-sm text-vscode-descriptionFg">
+                    Please check your database connection settings and try again.
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Left: Result Set Tabs (vertical) */}
         {activeRun && (
           <SideTabs

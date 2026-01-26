@@ -40,6 +40,8 @@ export type QueryRun = {
 
 export type Theme = 'light' | 'dark';
 
+export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'error';
+
 export type AppState = {
   runs: QueryRun[];
   activeRunId: string | null;
@@ -47,6 +49,8 @@ export type AppState = {
   // Selection aggregation computed from Tabulator
   selectionStats: SelectionStats | null;
   theme: Theme;
+  connectionStatus: ConnectionStatus;
+  connectionError?: string;
 };
 
 export type SelectionStats = {
@@ -63,6 +67,9 @@ export type SelectionStats = {
 
 // Messages FROM extension TO webview
 export type ExtensionMessage =
+  | { type: 'CONNECTION_STARTED'; payload: {} }
+  | { type: 'CONNECTION_SUCCESS'; payload: { message?: string } }
+  | { type: 'CONNECTION_ERROR'; payload: { message: string } }
   | { type: 'RUN_STARTED'; payload: { runId: string; sql: string; title: string; startedAt: number } }
   | { type: 'RESULT_SET_PENDING'; payload: { runId: string; resultSetId: string; title: string; statementIndex?: number; sql?: string } }
   | { type: 'RESULT_SET_STARTED'; payload: { runId: string; resultSetId: string; title: string; statementIndex?: number; sql?: string } }

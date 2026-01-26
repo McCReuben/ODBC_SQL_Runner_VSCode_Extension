@@ -83,6 +83,22 @@ export function reducer(state: AppState, action: Action): AppState {
       };
     }
 
+    case 'RUN_CANCELLED': {
+      return {
+        ...state,
+        runs: updateRun(state.runs, action.payload.runId, (run) => ({
+          ...run,
+          status: 'complete',
+          // Mark all running/pending result sets as cancelled
+          results: run.results.map((rs) =>
+            rs.status === 'running' || rs.status === 'pending'
+              ? { ...rs, status: 'cancelled' as const }
+              : rs
+          ),
+        })),
+      };
+    }
+
     // -------------------------------------------------------------------------
     // Result set lifecycle
     // -------------------------------------------------------------------------
@@ -179,6 +195,21 @@ export function reducer(state: AppState, action: Action): AppState {
             ...rs,
             status: 'error',
             errorMessage: action.payload.message,
+          })
+        ),
+      };
+    }
+
+    case 'RESULT_SET_CANCELLED': {
+      return {
+        ...state,
+        runs: updateResultSet(
+          state.runs,
+          action.payload.runId,
+          action.payload.resultSetId,
+          (rs) => ({
+            ...rs,
+            status: 'cancelled',
           })
         ),
       };

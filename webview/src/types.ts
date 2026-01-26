@@ -7,7 +7,7 @@ export type Column = {
   type?: string; // e.g., "string", "number", "date", etc.
 };
 
-export type ResultSetStatus = 'pending' | 'running' | 'complete' | 'error';
+export type ResultSetStatus = 'pending' | 'running' | 'complete' | 'error' | 'cancelled';
 
 export type ResultSet = {
   id: string;
@@ -69,12 +69,15 @@ export type ExtensionMessage =
   | { type: 'RESULT_SET_ROWS'; payload: { runId: string; resultSetId: string; rows: Array<Record<string, unknown>>; append: boolean } }
   | { type: 'RESULT_SET_COMPLETE'; payload: { runId: string; resultSetId: string; rowCount?: number; executionTimeMs?: number } }
   | { type: 'RESULT_SET_ERROR'; payload: { runId: string; resultSetId: string; message: string } }
+  | { type: 'RESULT_SET_CANCELLED'; payload: { runId: string; resultSetId: string } }
   | { type: 'RUN_COMPLETE'; payload: { runId: string } }
-  | { type: 'RUN_ERROR'; payload: { runId: string; message: string } };
+  | { type: 'RUN_ERROR'; payload: { runId: string; message: string } }
+  | { type: 'RUN_CANCELLED'; payload: { runId: string } };
 
 // Messages FROM webview TO extension
 export type WebviewMessage =
   | { type: 'WEBVIEW_READY' }
   | { type: 'USER_SELECTED_RUN'; payload: { runId: string } }
   | { type: 'USER_SELECTED_RESULTSET'; payload: { runId: string; resultSetId: string } }
-  | { type: 'USER_CLOSED_RUN'; payload: { runId: string } };
+  | { type: 'USER_CLOSED_RUN'; payload: { runId: string } }
+  | { type: 'USER_CANCELLED_RUN'; payload: { runId: string } };

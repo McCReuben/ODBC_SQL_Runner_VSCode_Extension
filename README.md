@@ -7,6 +7,7 @@ Execute SQL queries with **Cmd+Enter** and view results in an interactive table 
 ## Features
 
 - **Smart Execution**: Execute current statement, selection, or multiple statements
+- **Query Cancellation**: Cancel running queries with a button in the status bar
 - **Session Management**: One connection per file with temporary table persistence
 - **Interactive Results**: Sort columns, select cells, view Sum/Avg/Max aggregations
 - **Query History**: Switch between past query executions with tabs
@@ -52,6 +53,12 @@ npm install && cd webview && npm install && npm run build && cd .. && npm run co
 - **Current Statement**: Place cursor in SQL, press **Cmd+Enter** (Mac) / **Ctrl+Enter** (Win/Linux)
 - **Selection**: Select SQL text, press **Cmd+Enter**
 - **Multiple Statements**: Select multiple statements separated by `;`, press **Cmd+Enter**
+
+### Cancel Running Queries
+
+When a query is running, a **Cancel** button appears in the status bar next to the "Running..." indicator. Click it to immediately stop query execution.
+
+**Note**: Cancelling terminates the Python process, which ends the database session. Temporary tables will be lost. A new session is created on the next query execution.
 
 ### Example: Session Persistence
 
@@ -172,7 +179,7 @@ cd webview && npm install && npm run build
 
 - One session per file (no multi-connection support per file)
 - Large result sets (>10k rows) may impact performance
-- No query cancellation yet
+- Query cancellation terminates the session (temporary tables are lost)
 
 ## License
 

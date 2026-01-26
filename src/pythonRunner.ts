@@ -236,6 +236,19 @@ export class PythonRunner {
     }
   }
 
+  /**
+   * Cancel/kill the running Python process immediately
+   * This will terminate any running query and lose session state
+   */
+  cancel(): void {
+    if (this.process) {
+      console.log("[PythonRunner] Cancelling query by killing process");
+      this.process.kill("SIGTERM");
+      this.process = null;
+      this.isReady = false;
+    }
+  }
+
   isRunning(): boolean {
     return this.process !== null && this.isReady;
   }
@@ -278,6 +291,19 @@ export class SessionManager {
       return session;
     } catch (error) {
       throw new Error(`Failed to start Python session: ${error}`);
+    }
+  }
+
+  /**
+   * Cancel the running query for a session by killing the Python process
+   * The session will be removed and recreated on next query
+   * WARNING: This will lose session state (temporary tables, etc.)
+   */
+  cancelSession(fileUri: string): void {
+    const session = this.sessions.get(fileUri);
+    if (session) {
+      session.cancel();
+      this.sessions.delete(fileUri);
     }
   }
 

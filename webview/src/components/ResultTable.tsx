@@ -256,6 +256,24 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(
       );
     }
 
+    if (resultSet.status === 'cancelled') {
+      return (
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="bg-orange-900/20 border border-orange-700 rounded-lg p-4 max-w-lg">
+            <div className="text-center">
+              <svg width="48" height="48" viewBox="0 0 16 16" fill="currentColor" className="text-orange-400 mx-auto mb-3">
+                <path d="M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1zm0 1a6 6 0 1 0 0 12A6 6 0 0 0 8 2zm3.5 4.5L9.914 8l1.586 1.5-.707.707L9.207 8.707l-1.586 1.586-.707-.707L8.5 8l-1.586-1.586.707-.707L9.207 7.293l1.586-1.586z" />
+              </svg>
+              <div className="text-orange-400 font-medium mb-1">Query Cancelled</div>
+              <div className="text-sm text-orange-300">
+                The query was cancelled before it could complete
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     if (resultSet.status === 'pending') {
       return (
         <div className="flex-1 flex items-center justify-center text-gray-500">

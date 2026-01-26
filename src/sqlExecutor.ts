@@ -2,20 +2,40 @@
  * SQL Executor - Coordinates query execution between editor, Python backend, and webview
  */
 
-import * as vscode from 'vscode';
-import { getSqlToExecute, StatementInfo } from './statementParser';
-import { SessionManager } from './pythonRunner';
-import { WebviewManager } from './webviewManager';
-import * as crypto from 'crypto';
-import * as path from 'path';
+import * as vscode from "vscode";
+import { getSqlToExecute, StatementInfo } from "./statementParser";
+import { SessionManager } from "./pythonRunner";
+import { WebviewManager } from "./webviewManager";
+import * as crypto from "crypto";
+import * as path from "path";
 
 export class SqlExecutor {
   private sessionManager: SessionManager;
   private webviewManager: WebviewManager;
+  private runningQueries: Map<string, string> = new Map(); // runId -> fileUri
+  private runningResultSets: Map<string, Set<string>> = new Map(); // runId -> Set<resultSetId>
+  private queryCounter: number = 0; // Incremental counter for query numbers
 
   constructor(context: vscode.ExtensionContext) {
     this.sessionManager = new SessionManager(context);
     this.webviewManager = new WebviewManager(context);
+
+    // Set up message handler for webview messages
+    this.webviewManager.setMessageHandler((message) => {
+      this.handleWebviewMessage(message);
+    });
+  }
+
+  /**
+   * Handle messages from the webview
+   */
+  private handleWebviewMessage(message: any) {
+    switch (message.type) {
+      case "USER_CANCELLED_RUN":
+        this.cancelQuery(message.payload.runId);
+        break;
+      // Other message types can be added here if needed
+    }
   }
 
   /**
@@ -25,15 +45,18 @@ export class SqlExecutor {
     const editor = vscode.window.activeTextEditor;
 
     if (!editor) {
-      vscode.window.showErrorMessage('No active editor');
+      vscode.window.showErrorMessage("No active editor");
       return;
     }
 
     // Verify it's a SQL file
-    if (editor.document.languageId !== 'sql') {
-      vscode.window.showErrorMessage('Active file is not a SQL file');
+    if (editor.document.languageId !== "sql") {
+      vscode.window.showErrorMessage("Active file is not a SQL file");
       return;
     }
+
+    // Generate run ID early so we can use it in catch blocks
+    const runId = this.generateId();
 
     try {
       // Get the file URI and content
@@ -47,7 +70,7 @@ export class SqlExecutor {
         ? null
         : {
             start: editor.document.offsetAt(selection.start),
-            end: editor.document.offsetAt(selection.end)
+            end: editor.document.offsetAt(selection.end),
           };
 
       // Parse SQL to execute
@@ -60,19 +83,23 @@ export class SqlExecutor {
       }
 
       if (statements.length === 0) {
-        vscode.window.showWarningMessage('No SQL statements to execute');
+        vscode.window.showWarningMessage("No SQL statements to execute");
         return;
       }
 
-      // Generate run ID
-      const runId = this.generateId();
+      // Track this running query
+      this.runningQueries.set(runId, fileUri);
+      this.runningResultSets.set(runId, new Set());
 
       // Get or create session for this file
       let session;
       try {
         session = await this.sessionManager.getOrCreateSession(fileUri);
       } catch (error: any) {
-        vscode.window.showErrorMessage(`Failed to create database session: ${error.message}`);
+        this.runningQueries.delete(runId);
+        vscode.window.showErrorMessage(
+          `Failed to create database session: ${error.message}`,
+        );
         return;
       }
 
@@ -83,18 +110,19 @@ export class SqlExecutor {
       await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
-          title: 'Executing SQL query...',
-          cancellable: false
+          title: "Executing SQL query...",
+          cancellable: false,
         },
         async (progress) => {
           try {
             // Send RUN_STARTED message
+            this.queryCounter++;
             const sqlPreview = this.getSqlPreview(statements);
             this.webviewManager.sendRunStarted(
               fileUri,
               runId,
               sqlPreview,
-              `Query ${new Date().toLocaleTimeString()}`
+              `Query ${this.queryCounter}`,
             );
 
             // Execute each statement
@@ -102,8 +130,11 @@ export class SqlExecutor {
               const stmt = statements[i];
               const resultSetId = `${runId}-rs-${i}`;
 
+              // Track this result set as running
+              this.runningResultSets.get(runId)?.add(resultSetId);
+
               progress.report({
-                message: `Executing statement ${i + 1} of ${statements.length}...`
+                message: `Executing statement ${i + 1} of ${statements.length}...`,
               });
 
               // Send RESULT_SET_STARTED
@@ -113,12 +144,15 @@ export class SqlExecutor {
                 resultSetId,
                 `Result ${i + 1}`,
                 i,
-                stmt.sql
+                stmt.sql,
               );
 
               try {
                 // Execute the query
-                const result = await session.executeQuery(stmt.sql, resultSetId);
+                const result = await session.executeQuery(
+                  stmt.sql,
+                  resultSetId,
+                );
 
                 // DEBUG: Log the result received by SqlExecutor
                 console.log("[DEBUG] SqlExecutor received result:", {
@@ -127,7 +161,7 @@ export class SqlExecutor {
                   hasResults: result.hasResults,
                   columnsLength: result.columns?.length,
                   rowsLength: result.rows?.length,
-                  sql: stmt.sql.substring(0, 100)
+                  sql: stmt.sql.substring(0, 100),
                 });
 
                 if (!result.success) {
@@ -136,13 +170,17 @@ export class SqlExecutor {
                     fileUri,
                     runId,
                     resultSetId,
-                    result.error || 'Unknown error'
+                    result.error || "Unknown error",
                   );
+                  // Remove from running result sets
+                  this.runningResultSets.get(runId)?.delete(resultSetId);
                   continue;
                 }
 
                 if (result.hasResults && result.columns && result.rows) {
-                  console.log("[DEBUG] SqlExecutor: Query has results, sending schema and rows");
+                  console.log(
+                    "[DEBUG] SqlExecutor: Query has results, sending schema and rows",
+                  );
                   console.log("[DEBUG] Columns:", result.columns);
                   console.log("[DEBUG] First 2 rows:", result.rows.slice(0, 2));
                   // Send schema
@@ -150,7 +188,7 @@ export class SqlExecutor {
                     fileUri,
                     runId,
                     resultSetId,
-                    result.columns
+                    result.columns,
                   );
 
                   // Send rows
@@ -159,7 +197,7 @@ export class SqlExecutor {
                     runId,
                     resultSetId,
                     result.rows,
-                    false
+                    false,
                   );
 
                   // Send complete
@@ -168,26 +206,37 @@ export class SqlExecutor {
                     runId,
                     resultSetId,
                     result.rowCount || 0,
-                    result.executionTimeMs || 0
+                    result.executionTimeMs || 0,
                   );
-                  console.log("[DEBUG] SqlExecutor: Sent schema, rows, and complete messages");
+                  // Remove from running result sets
+                  this.runningResultSets.get(runId)?.delete(resultSetId);
+                  console.log(
+                    "[DEBUG] SqlExecutor: Sent schema, rows, and complete messages",
+                  );
                 } else {
-                  console.log("[DEBUG] SqlExecutor: Query has no results (DDL/DML)");
+                  console.log(
+                    "[DEBUG] SqlExecutor: Query has no results (DDL/DML)",
+                  );
                   // DDL/DML query with no results
                   // Send a message as a "schema" with info
                   this.webviewManager.sendResultSetSchema(
                     fileUri,
                     runId,
                     resultSetId,
-                    [{ name: 'Message', type: 'string' }]
+                    [{ name: "Message", type: "string" }],
                   );
 
                   this.webviewManager.sendResultSetRows(
                     fileUri,
                     runId,
                     resultSetId,
-                    [{ Message: result.message || 'Query executed successfully' }],
-                    false
+                    [
+                      {
+                        Message:
+                          result.message || "Query executed successfully",
+                      },
+                    ],
+                    false,
                   );
 
                   this.webviewManager.sendResultSetComplete(
@@ -195,16 +244,20 @@ export class SqlExecutor {
                     runId,
                     resultSetId,
                     result.rowCount || 0,
-                    result.executionTimeMs || 0
+                    result.executionTimeMs || 0,
                   );
+                  // Remove from running result sets
+                  this.runningResultSets.get(runId)?.delete(resultSetId);
                 }
               } catch (error: any) {
                 this.webviewManager.sendResultSetError(
                   fileUri,
                   runId,
                   resultSetId,
-                  error.message || 'Unknown error'
+                  error.message || "Unknown error",
                 );
+                // Remove from running result sets
+                this.runningResultSets.get(runId)?.delete(resultSetId);
               }
             }
 
@@ -212,30 +265,74 @@ export class SqlExecutor {
             this.webviewManager.sendRunComplete(fileUri, runId);
 
             vscode.window.showInformationMessage(
-              `Executed ${statements.length} statement${statements.length > 1 ? 's' : ''}`
+              `Executed ${statements.length} statement${statements.length > 1 ? "s" : ""}`,
             );
           } catch (error: any) {
             // Send RUN_ERROR
             this.webviewManager.sendRunError(
               fileUri,
               runId,
-              error.message || 'Unknown error'
+              error.message || "Unknown error",
             );
-            vscode.window.showErrorMessage(`Query execution failed: ${error.message}`);
+            vscode.window.showErrorMessage(
+              `Query execution failed: ${error.message}`,
+            );
+          } finally {
+            // Remove from running queries
+            this.runningQueries.delete(runId);
+            this.runningResultSets.delete(runId);
           }
-        }
+        },
       );
     } catch (error: any) {
+      this.runningQueries.delete(runId);
+      this.runningResultSets.delete(runId);
       vscode.window.showErrorMessage(`Unexpected error: ${error.message}`);
-      console.error('SQL execution error:', error);
+      console.error("SQL execution error:", error);
     }
+  }
+
+  /**
+   * Cancel a running query
+   */
+  cancelQuery(runId: string) {
+    const fileUri = this.runningQueries.get(runId);
+    if (!fileUri) {
+      console.log(`[SqlExecutor] No running query found with runId: ${runId}`);
+      return;
+    }
+
+    console.log(`[SqlExecutor] Cancelling query ${runId} for file ${fileUri}`);
+
+    // Cancel the session (kills Python process)
+    this.sessionManager.cancelSession(fileUri);
+
+    // Send cancellation messages to webview
+    // First, cancel any running result sets
+    const runningResultSetIds = this.runningResultSets.get(runId);
+    if (runningResultSetIds) {
+      runningResultSetIds.forEach((resultSetId) => {
+        this.webviewManager.sendResultSetCancelled(fileUri, runId, resultSetId);
+      });
+    }
+
+    // Then send run cancelled message
+    this.webviewManager.sendRunCancelled(fileUri, runId);
+
+    // Remove from running queries
+    this.runningQueries.delete(runId);
+    this.runningResultSets.delete(runId);
+
+    vscode.window.showWarningMessage(
+      "Query cancelled. Session will be recreated on next execution.",
+    );
   }
 
   /**
    * Generate a unique ID
    */
   private generateId(): string {
-    return crypto.randomBytes(8).toString('hex');
+    return crypto.randomBytes(8).toString("hex");
   }
 
   /**
@@ -247,7 +344,7 @@ export class SqlExecutor {
     }
 
     // Multiple statements - show them all with separators
-    return statements.map(s => s.sql).join('\n;\n');
+    return statements.map((s) => s.sql).join("\n;\n");
   }
 
   /**

@@ -6,6 +6,8 @@ type StatusBarProps = {
   queryTimestamp?: number;
   theme: Theme;
   onToggleTheme: () => void;
+  isQueryRunning?: boolean;
+  onCancelQuery?: () => void;
 };
 
 /**
@@ -13,8 +15,9 @@ type StatusBarProps = {
  * - Result set metadata (query timestamp, row count, execution time)
  * - Selection aggregates (sum, avg, max) when numeric cells are selected
  * - Settings gear icon for theme toggle
+ * - Cancel button when query is running
  */
-export function StatusBar({ resultSet, selectionStats, queryTimestamp, theme, onToggleTheme }: StatusBarProps) {
+export function StatusBar({ resultSet, selectionStats, queryTimestamp, theme, onToggleTheme, isQueryRunning, onCancelQuery }: StatusBarProps) {
   return (
     <div className="h-6 flex items-center justify-between px-3 border-t border-vscode-border bg-vscode-tab-inactive text-[11px]">
       {/* Left side: Result set info */}
@@ -28,10 +31,21 @@ export function StatusBar({ resultSet, selectionStats, queryTimestamp, theme, on
               </span>
             )}
             {resultSet.status === 'running' && (
-              <span className="text-yellow-400 flex items-center gap-1">
-                <span className="spinner w-3 h-3 border-2 border-yellow-400 border-t-transparent rounded-full" />
-                Running...
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-yellow-400 flex items-center gap-1">
+                  <span className="spinner w-3 h-3 border-2 border-yellow-400 border-t-transparent rounded-full" />
+                  Running...
+                </span>
+                {isQueryRunning && onCancelQuery && (
+                  <button
+                    onClick={onCancelQuery}
+                    className="px-2 py-0.5 text-[10px] bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+                    title="Cancel query execution"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
             )}
             {resultSet.status === 'complete' && (
               <>
@@ -50,6 +64,14 @@ export function StatusBar({ resultSet, selectionStats, queryTimestamp, theme, on
             {resultSet.status === 'error' && (
               <span className="text-red-400 truncate max-w-xs" title={resultSet.errorMessage}>
                 Error: {resultSet.errorMessage}
+              </span>
+            )}
+            {resultSet.status === 'cancelled' && (
+              <span className="text-orange-400 flex items-center gap-1">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1zm0 1a6 6 0 1 0 0 12A6 6 0 0 0 8 2zm3.5 4.5L9.914 8l1.586 1.5-.707.707L9.207 8.707l-1.586 1.586-.707-.707L8.5 8l-1.586-1.586.707-.707L9.207 7.293l1.586-1.586z" />
+                </svg>
+                Cancelled
               </span>
             )}
           </>

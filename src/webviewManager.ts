@@ -11,10 +11,20 @@ export interface Column {
   type: string;
 }
 
+type MessageHandler = (message: any) => void;
+
 export class WebviewManager {
   private panels: Map<string, vscode.WebviewPanel> = new Map();
+  private onMessageCallback?: MessageHandler;
 
   constructor(private context: vscode.ExtensionContext) {}
+
+  /**
+   * Set a callback to handle messages from the webview
+   */
+  setMessageHandler(handler: MessageHandler) {
+    this.onMessageCallback = handler;
+  }
 
   /**
    * Get or create a webview panel for a file
@@ -44,6 +54,17 @@ export class WebviewManager {
 
     // Set HTML content
     panel.webview.html = this.getWebviewContent(panel.webview);
+
+    // Handle messages from webview
+    panel.webview.onDidReceiveMessage(
+      (message) => {
+        if (this.onMessageCallback) {
+          this.onMessageCallback(message);
+        }
+      },
+      null,
+      this.context.subscriptions
+    );
 
     // Handle panel disposal
     panel.onDidDispose(() => {
@@ -238,6 +259,39 @@ export class WebviewManager {
         payload: {
           runId,
           message
+        }
+      });
+    }
+  }
+
+  /**
+   * Send RUN_CANCELLED message
+   */
+  sendRunCancelled(fileUri: string, runId: string) {
+    const panel = this.panels.get(fileUri);
+    if (panel) {
+      panel.webview.postMessage({
+        type: 'RUN_CANCELLED',
+        payload: { runId }
+      });
+    }
+  }
+
+  /**
+   * Send RESULT_SET_CANCELLED message
+   */
+  sendResultSetCancelled(
+    fileUri: string,
+    runId: string,
+    resultSetId: string
+  ) {
+    const panel = this.panels.get(fileUri);
+    if (panel) {
+      panel.webview.postMessage({
+        type: 'RESULT_SET_CANCELLED',
+        payload: {
+          runId,
+          resultSetId
         }
       });
     }

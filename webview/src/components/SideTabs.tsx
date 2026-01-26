@@ -57,6 +57,11 @@ export function SideTabs({ results, activeResultSetId, onSelectResultSet }: Side
                   Error
                 </div>
               )}
+              {rs.status === 'cancelled' && (
+                <div className="text-[10px] text-orange-400 truncate">
+                  Cancelled
+                </div>
+              )}
             </div>
           </div>
         );
@@ -74,6 +79,13 @@ function ResultStatusIndicator({ status }: { status: ResultSet['status'] }) {
   if (status === 'error') {
     return (
       <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" title="Error" />
+    );
+  }
+  if (status === 'cancelled') {
+    return (
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" className="text-orange-400 flex-shrink-0">
+        <path d="M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1zm0 1a6 6 0 1 0 0 12A6 6 0 0 0 8 2zm3.5 4.5L9.914 8l1.586 1.5-.707.707L9.207 8.707l-1.586 1.586-.707-.707L8.5 8l-1.586-1.586.707-.707L9.207 7.293l1.586-1.586z" />
+      </svg>
     );
   }
   // Complete

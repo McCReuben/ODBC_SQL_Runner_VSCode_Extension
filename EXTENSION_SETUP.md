@@ -163,6 +163,7 @@ The results panel includes:
 - **Result Set Tabs** (Left) - For queries with multiple result sets
 - **Interactive Table** - Sort columns, select multiple cells
 - **Live Aggregation** - See Sum/Avg/Max of selected numeric cells in status bar
+- **Query Cancellation** - Cancel button appears in status bar when queries are running
 
 ## Troubleshooting
 
@@ -206,6 +207,10 @@ npm run build
 ### Temporary Tables Not Persisting
 
 **Issue**: Make sure you're executing queries from the same file. Each file has its own session.
+
+### Query Cancellation Loses Temp Tables
+
+**Behavior**: When you cancel a running query, the Python process is terminated, ending the database session. Any temporary tables will be lost. A new session is automatically created on the next query execution.
 
 ## Project Structure
 
@@ -265,14 +270,13 @@ python3 sql_executor.py
 
 ## Known Limitations
 
-- Only supports ODBC connections via pyodbc
+- Only supports ODBC connections via pyodbc (or SQLite mock mode)
 - One session per file (no multi-connection support per file)
 - Large result sets (>10k rows) may cause performance issues
-- No query cancellation support yet
+- Query cancellation terminates the session (temporary tables are lost)
 
 ## Next Steps
 
-- Add query cancellation
 - Support for saving results to CSV/Excel
 - Query history persistence
 - Connection pooling

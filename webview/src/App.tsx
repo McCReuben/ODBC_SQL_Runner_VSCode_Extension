@@ -99,6 +99,18 @@ export function App() {
     dispatch({ type: 'TOGGLE_THEME' });
   }, []);
 
+  const handleCancelQuery = useCallback(() => {
+    if (state.activeRunId) {
+      postMessage({
+        type: 'USER_CANCELLED_RUN',
+        payload: { runId: state.activeRunId }
+      });
+    }
+  }, [state.activeRunId]);
+
+  // Check if the active run has any running results
+  const isQueryRunning = activeRun?.status === 'running';
+
   // Handle ESC key to close modal
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -160,6 +172,8 @@ export function App() {
         queryTimestamp={activeRun?.startedAt}
         theme={state.theme}
         onToggleTheme={handleToggleTheme}
+        isQueryRunning={isQueryRunning}
+        onCancelQuery={handleCancelQuery}
       />
 
       {/* SQL Modal */}

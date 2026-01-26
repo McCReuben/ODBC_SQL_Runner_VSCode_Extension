@@ -173,6 +173,12 @@ class SqlExecutorMock:
         start_time = time.time()
 
         try:
+            # Check for slow query simulation trigger
+            # Usage: Add -- SLOW_QUERY or /* SLOW_QUERY */ to your SQL
+            if "SLOW_QUERY" in sql.upper():
+                # Simulate a slow query with 5 second delay
+                time.sleep(10)
+            
             # Execute the SQL
             self.cursor.execute(sql)
 

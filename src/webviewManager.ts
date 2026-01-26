@@ -117,6 +117,45 @@ export class WebviewManager {
   }
 
   /**
+   * Send RECONNECT_STARTED message
+   */
+  sendReconnectStarted(fileUri: string) {
+    const panel = this.panels.get(fileUri);
+    if (panel) {
+      panel.webview.postMessage({
+        type: 'RECONNECT_STARTED',
+        payload: {}
+      });
+    }
+  }
+
+  /**
+   * Send RECONNECT_SUCCESS message
+   */
+  sendReconnectSuccess(fileUri: string, message?: string) {
+    const panel = this.panels.get(fileUri);
+    if (panel) {
+      panel.webview.postMessage({
+        type: 'RECONNECT_SUCCESS',
+        payload: { message }
+      });
+    }
+  }
+
+  /**
+   * Send RECONNECT_ERROR message
+   */
+  sendReconnectError(fileUri: string, message: string) {
+    const panel = this.panels.get(fileUri);
+    if (panel) {
+      panel.webview.postMessage({
+        type: 'RECONNECT_ERROR',
+        payload: { message }
+      });
+    }
+  }
+
+  /**
    * Send RUN_STARTED message
    */
   sendRunStarted(

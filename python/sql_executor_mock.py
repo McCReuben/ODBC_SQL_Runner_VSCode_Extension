@@ -272,6 +272,34 @@ class SqlExecutorMock:
         # Default to string
         return "string"
 
+    def reconnect(self) -> Dict[str, Any]:
+        """Reconnect to the database (close and reopen connection)"""
+        try:
+            # Close existing connection
+            if self.cursor:
+                self.cursor.close()
+            if self.connection:
+                self.connection.close()
+            
+            # Reestablish connection and recreate sample data
+            self.connection = sqlite3.connect(":memory:")
+            self.connection.row_factory = sqlite3.Row
+            self.cursor = self.connection.cursor()
+            
+            # Recreate sample tables
+            self._create_sample_data()
+            
+            return {
+                "success": True,
+                "message": "Reconnected to Mock SQLite Database (in-memory)"
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "traceback": traceback.format_exc()
+            }
+
     def close(self):
         """Close the connection"""
         if self.cursor:
@@ -319,6 +347,23 @@ def main():
                     result = executor.execute_query(sql, result_set_id)
                     send_message({
                         "type": "EXECUTE_RESULT",
+                        "payload": result
+                    })
+
+                elif command_type == "RECONNECT":
+                    if not executor:
+                        send_message({
+                            "type": "RECONNECT_RESULT",
+                            "payload": {
+                                "success": False,
+                                "error": "No executor instance available"
+                            }
+                        })
+                        continue
+                    
+                    result = executor.reconnect()
+                    send_message({
+                        "type": "RECONNECT_RESULT",
                         "payload": result
                     })
 

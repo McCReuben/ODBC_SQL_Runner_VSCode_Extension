@@ -108,6 +108,12 @@ export function App() {
     }
   }, [state.activeRunId]);
 
+  const handleReconnect = useCallback(() => {
+    postMessage({
+      type: 'USER_RECONNECT_DB'
+    });
+  }, []);
+
   // Check if the active run has any running results
   const isQueryRunning = activeRun?.status === 'running';
 
@@ -212,6 +218,8 @@ export function App() {
         onToggleTheme={handleToggleTheme}
         isQueryRunning={isQueryRunning}
         onCancelQuery={handleCancelQuery}
+        connectionStatus={state.connectionStatus}
+        onReconnect={handleReconnect}
       />
 
       {/* SQL Modal */}

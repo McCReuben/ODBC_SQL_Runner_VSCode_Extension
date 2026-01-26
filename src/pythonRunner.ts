@@ -183,6 +183,9 @@ export class PythonRunner {
         case "CONNECT":
           responseType = "CONNECT_RESULT";
           break;
+        case "RECONNECT":
+          responseType = "RECONNECT_RESULT";
+          break;
         case "EXECUTE":
           console.log("Sending EXECUTE command for SQL:", command.sql);
           responseType = "EXECUTE_RESULT";
@@ -306,6 +309,13 @@ export class PythonRunner {
     });
   }
 
+  async reconnect(): Promise<{ success: boolean; message?: string; error?: string }> {
+    await this.readyPromise;
+    
+    const response = await this.sendCommand({ type: "RECONNECT" });
+    return response.payload as { success: boolean; message?: string; error?: string };
+  }
+
   async close(): Promise<void> {
     if (this.process) {
       await this.sendCommand({ type: "CLOSE" });
@@ -376,6 +386,28 @@ export class SessionManager {
       return session;
     } catch (error) {
       throw new Error(`Failed to start Python session: ${error}`);
+    }
+  }
+
+  /**
+   * Reconnect to the database for a session
+   */
+  async reconnectSession(fileUri: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    const session = this.sessions.get(fileUri);
+    if (!session) {
+      return {
+        success: false,
+        error: "No active session found"
+      };
+    }
+
+    try {
+      return await session.reconnect();
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || "Reconnection failed"
+      };
     }
   }
 

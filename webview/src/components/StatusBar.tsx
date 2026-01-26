@@ -1,4 +1,4 @@
-import type { ResultSet, SelectionStats, Theme } from '../types';
+import type { ResultSet, SelectionStats, Theme, ConnectionStatus } from '../types';
 
 type StatusBarProps = {
   resultSet: ResultSet | null;
@@ -8,6 +8,8 @@ type StatusBarProps = {
   onToggleTheme: () => void;
   isQueryRunning?: boolean;
   onCancelQuery?: () => void;
+  connectionStatus?: ConnectionStatus;
+  onReconnect?: () => void;
 };
 
 /**
@@ -16,8 +18,19 @@ type StatusBarProps = {
  * - Selection aggregates (sum, avg, max) when numeric cells are selected
  * - Settings gear icon for theme toggle
  * - Cancel button when query is running
+ * - Reconnect button for connection errors
  */
-export function StatusBar({ resultSet, selectionStats, queryTimestamp, theme, onToggleTheme, isQueryRunning, onCancelQuery }: StatusBarProps) {
+export function StatusBar({ 
+  resultSet, 
+  selectionStats, 
+  queryTimestamp, 
+  theme, 
+  onToggleTheme, 
+  isQueryRunning, 
+  onCancelQuery, 
+  connectionStatus,
+  onReconnect 
+}: StatusBarProps) {
   return (
     <div className="h-6 flex items-center justify-between px-3 border-t border-vscode-border bg-vscode-tab-inactive text-[11px]">
       {/* Left side: Result set info */}
@@ -114,6 +127,18 @@ export function StatusBar({ resultSet, selectionStats, queryTimestamp, theme, on
           <span className="text-gray-500">Select cells to see aggregates</span>
         )}
 
+        {/* Reconnect button - show when connection error and not running query */}
+        {connectionStatus === 'error' && !isQueryRunning && onReconnect && (
+          <button
+            onClick={onReconnect}
+            className="flex items-center gap-1.5 px-2 py-0.5 text-[10px] bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+            title="Reconnect to database"
+          >
+            <ReconnectIcon />
+            <span>Reconnect</span>
+          </button>
+        )}
+
         {/* Theme toggle button */}
         <button
           onClick={onToggleTheme}
@@ -159,4 +184,19 @@ function formatNumber(n: number): string {
   // Round to avoid floating point display issues
   const rounded = Math.round(n * 1000000) / 1000000;
   return rounded.toLocaleString(undefined, { maximumFractionDigits: 6 });
+}
+
+function ReconnectIcon() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 16 16"
+      fill="currentColor"
+    >
+      <path d="M8 1a7 7 0 0 0-7 7h1a6 6 0 0 1 6-6V1zm0 14a7 7 0 0 0 7-7h-1a6 6 0 0 1-6 6v1z" />
+      <path d="M4.5 8.5L3 7l-1.5 1.5L0 7l3-3 3 3-1.5 1.5L3 7l1.5 1.5z" />
+      <path d="M11.5 7.5L13 9l1.5-1.5L16 9l-3 3-3-3 1.5-1.5L13 9l-1.5-1.5z" />
+    </svg>
+  );
 }

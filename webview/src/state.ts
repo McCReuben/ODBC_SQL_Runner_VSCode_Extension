@@ -71,6 +71,30 @@ export function reducer(state: AppState, action: Action): AppState {
       };
     }
 
+    case 'RECONNECT_STARTED': {
+      return {
+        ...state,
+        connectionStatus: 'connecting',
+        connectionError: undefined,
+      };
+    }
+
+    case 'RECONNECT_SUCCESS': {
+      return {
+        ...state,
+        connectionStatus: 'connected',
+        connectionError: undefined,
+      };
+    }
+
+    case 'RECONNECT_ERROR': {
+      return {
+        ...state,
+        connectionStatus: 'error',
+        connectionError: action.payload.message,
+      };
+    }
+
     // -------------------------------------------------------------------------
     // Run lifecycle
     // -------------------------------------------------------------------------

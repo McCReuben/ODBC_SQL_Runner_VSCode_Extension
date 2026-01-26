@@ -34,6 +34,9 @@ export class SqlExecutor {
       case "USER_CANCELLED_RUN":
         this.cancelQuery(message.payload.runId);
         break;
+      case "USER_RECONNECT_DB":
+        this.reconnectDatabase();
+        break;
       // Other message types can be added here if needed
     }
   }
@@ -342,6 +345,58 @@ export class SqlExecutor {
       this.runningResultSets.delete(runId);
       vscode.window.showErrorMessage(`Unexpected error: ${error.message}`);
       console.error("SQL execution error:", error);
+    }
+  }
+
+  /**
+   * Reconnect to the database
+   */
+  async reconnectDatabase() {
+    const editor = vscode.window.activeTextEditor;
+
+    if (!editor) {
+      vscode.window.showErrorMessage("No active editor");
+      return;
+    }
+
+    const fileUri = editor.document.uri.toString();
+
+    try {
+      // Get the panel for this file (if it exists)
+      const fileName = path.basename(editor.document.fileName);
+      const panel = this.webviewManager.getOrCreatePanel(fileUri, fileName);
+
+      // Notify webview that reconnection is starting
+      this.webviewManager.sendReconnectStarted(fileUri);
+
+      // Attempt reconnection
+      const result = await this.sessionManager.reconnectSession(fileUri);
+
+      if (result.success) {
+        // Notify webview of success
+        this.webviewManager.sendReconnectSuccess(fileUri, result.message);
+        vscode.window.showInformationMessage(
+          result.message || "Successfully reconnected to database"
+        );
+      } else {
+        // Notify webview of error
+        this.webviewManager.sendReconnectError(
+          fileUri,
+          result.error || "Reconnection failed"
+        );
+        vscode.window.showErrorMessage(
+          `Reconnection failed: ${result.error || "Unknown error"}`
+        );
+      }
+    } catch (error: any) {
+      const fileUri = editor.document.uri.toString();
+      this.webviewManager.sendReconnectError(
+        fileUri,
+        error.message || "Unexpected error during reconnection"
+      );
+      vscode.window.showErrorMessage(
+        `Reconnection failed: ${error.message || "Unknown error"}`
+      );
     }
   }
 

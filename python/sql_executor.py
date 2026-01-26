@@ -131,6 +131,29 @@ class SqlExecutor:
         else:
             return "string"
 
+    def reconnect(self) -> Dict[str, Any]:
+        """Reconnect to the database (close and reopen connection)"""
+        try:
+            # Close existing connection
+            if self.cursor:
+                self.cursor.close()
+            if self.connection:
+                self.connection.close()
+            
+            # Reestablish connection
+            self.connection = pyodbc.connect(f"DSN={self.dsn}", autocommit=True)
+            self.cursor = self.connection.cursor()
+            return {
+                "success": True,
+                "message": f"Reconnected to {self.dsn}"
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "traceback": traceback.format_exc()
+            }
+
     def close(self):
         """Close the connection"""
         if self.cursor:
@@ -186,6 +209,23 @@ def main():
                     
                     send_message({
                         "type": "EXECUTE_RESULT",
+                        "payload": result
+                    })
+
+                elif command_type == "RECONNECT":
+                    if not executor:
+                        send_message({
+                            "type": "RECONNECT_RESULT",
+                            "payload": {
+                                "success": False,
+                                "error": "No executor instance available"
+                            }
+                        })
+                        continue
+                    
+                    result = executor.reconnect()
+                    send_message({
+                        "type": "RECONNECT_RESULT",
                         "payload": result
                     })
 

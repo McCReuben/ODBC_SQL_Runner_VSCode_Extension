@@ -324,7 +324,13 @@ export class WebviewManager {
     fileUri: string,
     runId: string,
     resultSetId: string,
-    message: string
+    error: {
+      message: string;
+      type?: string;
+      details?: any;
+      rawError?: string;
+      traceback?: string;
+    }
   ) {
     const panel = this.panels.get(fileUri);
     if (panel) {
@@ -333,7 +339,8 @@ export class WebviewManager {
         payload: {
           runId,
           resultSetId,
-          message
+          message: error.message, // For backward compatibility
+          error: error // Structured error
         }
       });
     }

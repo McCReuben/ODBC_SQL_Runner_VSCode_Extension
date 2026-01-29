@@ -9,6 +9,26 @@ export type Column = {
 
 export type ResultSetStatus = 'pending' | 'running' | 'complete' | 'error' | 'cancelled';
 
+export type ErrorDetails = {
+  line?: number;
+  position?: number;
+  tableName?: string;
+  columnName?: string;
+  suggestions?: string[];
+  nearText?: string;
+  sqlSnippet?: string;
+  literalType?: string;
+  invalidValue?: string;
+};
+
+export type QueryError = {
+  message: string; // User-friendly error message
+  type?: string; // Error type (e.g., "Table Not Found", "Syntax Error")
+  details?: ErrorDetails; // Structured error details
+  rawError?: string; // Full original error for debugging
+  traceback?: string; // Full stack trace
+};
+
 export type ResultSet = {
   id: string;
   title: string; // "Result 1", "users table", etc.
@@ -19,7 +39,8 @@ export type ResultSet = {
   executionTimeMs?: number;
   statementIndex?: number;
   status: ResultSetStatus;
-  errorMessage?: string;
+  errorMessage?: string; // Legacy: simple error message string
+  error?: QueryError; // New: structured error information
 };
 
 export type QueryRunStatus = 'running' | 'complete' | 'error';
@@ -79,7 +100,7 @@ export type ExtensionMessage =
   | { type: 'RESULT_SET_SCHEMA'; payload: { runId: string; resultSetId: string; columns: Column[] } }
   | { type: 'RESULT_SET_ROWS'; payload: { runId: string; resultSetId: string; rows: Array<Record<string, unknown>>; append: boolean } }
   | { type: 'RESULT_SET_COMPLETE'; payload: { runId: string; resultSetId: string; rowCount?: number; executionTimeMs?: number } }
-  | { type: 'RESULT_SET_ERROR'; payload: { runId: string; resultSetId: string; message: string } }
+  | { type: 'RESULT_SET_ERROR'; payload: { runId: string; resultSetId: string; message?: string; error?: QueryError } }
   | { type: 'RESULT_SET_CANCELLED'; payload: { runId: string; resultSetId: string } }
   | { type: 'RUN_COMPLETE'; payload: { runId: string } }
   | { type: 'RUN_ERROR'; payload: { runId: string; message: string } }

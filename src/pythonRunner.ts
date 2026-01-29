@@ -16,6 +16,18 @@ export interface ExecuteRequest {
   resultSetId: string;
 }
 
+export interface ErrorDetails {
+  line?: number;
+  position?: number;
+  tableName?: string;
+  columnName?: string;
+  suggestions?: string[];
+  nearText?: string;
+  sqlSnippet?: string;
+  literalType?: string;
+  invalidValue?: string;
+}
+
 export interface ExecuteResult {
   success: boolean;
   resultSetId: string;
@@ -24,9 +36,14 @@ export interface ExecuteResult {
   rows?: any[];
   rowCount?: number;
   executionTimeMs?: number;
+  // Legacy error fields
   error?: string;
   message?: string;
   traceback?: string;
+  // New structured error fields
+  errorType?: string;
+  errorDetails?: ErrorDetails;
+  rawError?: string;
 }
 
 interface QueuedQuery {

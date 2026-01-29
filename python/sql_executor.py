@@ -9,11 +9,212 @@ import json
 import traceback
 import pyodbc
 import pandas as pd
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 import time
 import threading
 from decimal import Decimal
 from datetime import date, datetime, time as datetime_time
+import re
+
+
+class SparkErrorParser:
+    """
+    Parses verbose Spark/Hive ODBC errors into user-friendly messages.
+    Extracts the core error message and provides helpful context while
+    preserving the full error for debugging.
+    """
+    
+    @staticmethod
+    def parse_error(error_str: str) -> Tuple[str, str, Optional[Dict[str, Any]]]:
+        """
+        Parse a Spark/Hive error and extract meaningful information.
+        
+        Returns:
+            Tuple of (user_friendly_message, error_type, additional_info)
+        """
+        # Handle pyodbc error tuples that come as strings
+        if error_str.startswith("("):
+            # Extract the actual error message from the tuple string
+            match = re.search(r"'\[HY000\]\s+\[Simba\]\[ODBC\].*?Error running query:\s+(.+)", error_str)
+            if match:
+                error_str = match.group(1)
+        
+        # Try to identify the error type and extract the useful message
+        error_patterns = [
+            # TABLE_OR_VIEW_NOT_FOUND
+            (
+                r'\[TABLE_OR_VIEW_NOT_FOUND\].*?The table or view `([^`]+)` cannot be found\.',
+                "Table Not Found",
+                lambda m: SparkErrorParser._format_table_not_found(m.group(1), error_str)
+            ),
+            # UNRESOLVED_COLUMN with suggestions
+            (
+                r'\[UNRESOLVED_COLUMN\.WITH_SUGGESTION\].*?column or function parameter with name `([^`]+)` cannot be resolved\. Did you mean one of the following\? \[([^\]]+)\]',
+                "Column Not Found",
+                lambda m: SparkErrorParser._format_unresolved_column(m.group(1), m.group(2), error_str)
+            ),
+            # PARSE_SYNTAX_ERROR
+            (
+                r'\[PARSE_SYNTAX_ERROR\].*?Syntax error at or near ([^\(]+)\.\(line (\d+), pos (\d+)\)',
+                "Syntax Error",
+                lambda m: SparkErrorParser._format_syntax_error(m.group(1).strip(), m.group(2), m.group(3), error_str)
+            ),
+            # INVALID_TYPED_LITERAL
+            (
+                r'\[INVALID_TYPED_LITERAL\].*?The value of the typed literal "([^"]+)" is invalid: ([^\(]+)\.\(line (\d+), pos (\d+)\)',
+                "Invalid Literal",
+                lambda m: SparkErrorParser._format_invalid_literal(m.group(1), m.group(2), m.group(3), m.group(4), error_str)
+            ),
+            # Generic AnalysisException
+            (
+                r'org\.apache\.spark\.sql\.AnalysisException:\s*([^\n]+)',
+                "Analysis Error",
+                lambda m: SparkErrorParser._format_generic_analysis(m.group(1))
+            ),
+            # Generic HiveSQLException
+            (
+                r'org\.apache\.hive\.service\.cli\.HiveSQLException:\s*Error running query:\s*([^\n]+)',
+                "Query Error",
+                lambda m: SparkErrorParser._format_generic_query(m.group(1))
+            ),
+        ]
+        
+        # Try each pattern
+        for pattern, error_type, formatter in error_patterns:
+            match = re.search(pattern, error_str, re.DOTALL)
+            if match:
+                try:
+                    result = formatter(match)
+                    return result["message"], error_type, result.get("details")
+                except Exception:
+                    # If formatting fails, continue to next pattern
+                    pass
+        
+        # If no pattern matches, try to extract the first meaningful line
+        lines = error_str.split('\n')
+        for line in lines:
+            line = line.strip()
+            if line and not line.startswith('at ') and not line.startswith('Caused by:'):
+                return line[:500], "Database Error", None
+        
+        # Fallback: return truncated error
+        return error_str[:500] + ("..." if len(error_str) > 500 else ""), "Database Error", None
+    
+    @staticmethod
+    def _format_table_not_found(table_name: str, full_error: str) -> Dict[str, Any]:
+        """Format TABLE_OR_VIEW_NOT_FOUND error"""
+        # Extract line and position if available
+        location = SparkErrorParser._extract_location(full_error)
+        
+        message = f"Table or view '{table_name}' not found."
+        details = {
+            "tableName": table_name,
+            "suggestion": "Verify the table name spelling and that you have access to the schema."
+        }
+        
+        if location:
+            message += f" (line {location['line']}, position {location['pos']})"
+            details.update(location)
+        
+        return {"message": message, "details": details}
+    
+    @staticmethod
+    def _format_unresolved_column(column_name: str, suggestions: str, full_error: str) -> Dict[str, Any]:
+        """Format UNRESOLVED_COLUMN error"""
+        location = SparkErrorParser._extract_location(full_error)
+        
+        # Clean up suggestions
+        suggestions_list = [s.strip().strip('`') for s in suggestions.split(',')]
+        
+        message = f"Column '{column_name}' not found."
+        if suggestions_list:
+            message += f" Did you mean: {', '.join(suggestions_list)}?"
+        
+        details = {
+            "columnName": column_name,
+            "suggestions": suggestions_list
+        }
+        
+        if location:
+            message += f" (line {location['line']}, position {location['pos']})"
+            details.update(location)
+        
+        return {"message": message, "details": details}
+    
+    @staticmethod
+    def _format_syntax_error(near_text: str, line: str, pos: str, full_error: str) -> Dict[str, Any]:
+        """Format PARSE_SYNTAX_ERROR error"""
+        # Extract SQL snippet if available
+        sql_snippet = SparkErrorParser._extract_sql_snippet(full_error)
+        
+        message = f"Syntax error near '{near_text}' at line {line}, position {pos}."
+        details = {
+            "line": int(line),
+            "position": int(pos),
+            "nearText": near_text
+        }
+        
+        if sql_snippet:
+            details["sqlSnippet"] = sql_snippet
+            message += f"\n\nProblematic SQL:\n{sql_snippet}"
+        
+        return {"message": message, "details": details}
+    
+    @staticmethod
+    def _format_invalid_literal(literal_type: str, invalid_value: str, line: str, pos: str, full_error: str) -> Dict[str, Any]:
+        """Format INVALID_TYPED_LITERAL error"""
+        sql_snippet = SparkErrorParser._extract_sql_snippet(full_error)
+        
+        message = f"Invalid {literal_type} value: {invalid_value.strip()} (line {line}, position {pos})."
+        details = {
+            "literalType": literal_type,
+            "invalidValue": invalid_value.strip(),
+            "line": int(line),
+            "position": int(pos)
+        }
+        
+        if sql_snippet:
+            details["sqlSnippet"] = sql_snippet
+            message += f"\n\nProblematic SQL:\n{sql_snippet}"
+        
+        return {"message": message, "details": details}
+    
+    @staticmethod
+    def _format_generic_analysis(error_msg: str) -> Dict[str, Any]:
+        """Format generic AnalysisException"""
+        # Clean up the message
+        clean_msg = error_msg.split(';')[0].strip()
+        return {"message": clean_msg, "details": None}
+    
+    @staticmethod
+    def _format_generic_query(error_msg: str) -> Dict[str, Any]:
+        """Format generic query error"""
+        # Clean up the message
+        clean_msg = error_msg.split('\n')[0].strip()
+        return {"message": clean_msg, "details": None}
+    
+    @staticmethod
+    def _extract_location(error_str: str) -> Optional[Dict[str, int]]:
+        """Extract line and position from error string"""
+        match = re.search(r'line (\d+).*?pos (\d+)', error_str)
+        if match:
+            return {
+                "line": int(match.group(1)),
+                "pos": int(match.group(2))
+            }
+        return None
+    
+    @staticmethod
+    def _extract_sql_snippet(error_str: str) -> Optional[str]:
+        """Extract SQL snippet from error (the part between == SQL ==)"""
+        match = re.search(r'== SQL ==\n(.*?)\n\n', error_str, re.DOTALL)
+        if match:
+            snippet = match.group(1).strip()
+            # Limit snippet length
+            if len(snippet) > 500:
+                snippet = snippet[:500] + "\n..."
+            return snippet
+        return None
 
 
 class SqlExecutor:
@@ -168,11 +369,22 @@ class SqlExecutor:
 
         except Exception as e:
             execution_time_ms = int((time.time() - start_time) * 1000)
+            
+            # Parse the error to extract user-friendly message
+            error_str = str(e)
+            full_traceback = traceback.format_exc()
+            
+            # Use our error parser to get a clean message
+            clean_message, error_type, error_details = SparkErrorParser.parse_error(error_str)
+            
             return {
                 "success": False,
                 "resultSetId": result_set_id,
-                "error": str(e),
-                "traceback": traceback.format_exc(),
+                "error": clean_message,  # User-friendly error message
+                "errorType": error_type,  # Category of error
+                "errorDetails": error_details,  # Structured details (line, pos, suggestions, etc.)
+                "rawError": error_str,  # Full original error
+                "traceback": full_traceback,  # Full traceback
                 "executionTimeMs": execution_time_ms
             }
 

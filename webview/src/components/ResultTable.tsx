@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { TabulatorFull as Tabulator } from 'tabulator-tables';
 import type { ResultSet, SelectionStats } from '../types';
+import { ErrorDisplay } from './ErrorDisplay';
 
 type ResultTableProps = {
   resultSet: ResultSet | null;
@@ -244,16 +245,7 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(
     }
 
     if (resultSet.status === 'error') {
-      return (
-        <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 max-w-lg">
-            <div className="text-red-400 font-medium mb-2">Query Error</div>
-            <div className="text-sm text-red-300 font-mono whitespace-pre-wrap">
-              {resultSet.errorMessage || 'An unknown error occurred'}
-            </div>
-          </div>
-        </div>
-      );
+      return <ErrorDisplay error={resultSet.error} legacyMessage={resultSet.errorMessage} />;
     }
 
     if (resultSet.status === 'cancelled') {

@@ -209,12 +209,18 @@ export class SqlExecutor {
                 });
 
                 if (!result.success) {
-                  // Send error
+                  // Send structured error
                   this.webviewManager.sendResultSetError(
                     fileUri,
                     runId,
                     resultSetId,
-                    result.error || "Unknown error",
+                    {
+                      message: result.error || "Unknown error",
+                      type: result.errorType,
+                      details: result.errorDetails,
+                      rawError: result.rawError,
+                      traceback: result.traceback,
+                    }
                   );
                   // Remove from running result sets
                   this.runningResultSets.get(runId)?.delete(resultSetId);
@@ -301,7 +307,11 @@ export class SqlExecutor {
                   fileUri,
                   runId,
                   resultSetId,
-                  error.message || "Unknown error",
+                  {
+                    message: error.message || "Unknown error",
+                    type: "Execution Error",
+                    rawError: error.stack || error.toString(),
+                  }
                 );
                 // Remove from running result sets
                 this.runningResultSets.get(runId)?.delete(resultSetId);

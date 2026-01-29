@@ -260,7 +260,8 @@ export function reducer(state: AppState, action: Action): AppState {
           (rs) => ({
             ...rs,
             status: 'error',
-            errorMessage: action.payload.message,
+            errorMessage: action.payload.message, // Legacy support
+            error: action.payload.error, // New structured error
           })
         ),
       };

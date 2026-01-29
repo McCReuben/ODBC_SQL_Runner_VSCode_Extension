@@ -65,6 +65,15 @@ export function TopTabs({ runs, activeRunId, onSelectRun, onCloseRun }: TopTabsP
 }
 
 function StatusIndicator({ run }: { run: QueryRun }) {
+  // Check if any result set has an error
+  const hasError = run.status === 'error' || run.results.some(rs => rs.status === 'error');
+  
+  if (hasError) {
+    return (
+      <span className="w-2 h-2 rounded-full bg-red-500" title="Error" />
+    );
+  }
+  
   if (run.status === 'running') {
     // Check if all result sets are pending (waiting for execution)
     const hasOnlyPendingQueries = run.results.length > 0 && run.results.every(rs => rs.status === 'pending');
@@ -84,12 +93,14 @@ function StatusIndicator({ run }: { run: QueryRun }) {
       <span className="spinner w-3 h-3 border-2 border-vscode-accent border-t-transparent rounded-full" />
     );
   }
-  if (run.status === 'error') {
+  
+  // Complete - show green circle for successful completion
+  if (run.status === 'complete') {
     return (
-      <span className="w-2 h-2 rounded-full bg-red-500" title="Error" />
+      <span className="w-2 h-2 rounded-full bg-green-500" title="Completed successfully" />
     );
   }
-  // Complete - show nothing or a subtle indicator
+  
   return null;
 }
 

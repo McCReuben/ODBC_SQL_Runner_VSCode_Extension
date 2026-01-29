@@ -170,7 +170,7 @@ export function App() {
                     {state.connectionError || 'Failed to connect to the database'}
                   </p>
                   <p className="text-sm text-vscode-descriptionFg">
-                    Please check your database connection settings and try again.
+                    Please check your DSN setup and ensure your SSH tunnel is open, or try again.
                   </p>
                 </>
               )}

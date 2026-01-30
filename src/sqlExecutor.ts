@@ -127,10 +127,16 @@ export class SqlExecutor {
         {
           location: vscode.ProgressLocation.Notification,
           title: "Executing SQL query...",
-          cancellable: false,
+          cancellable: true,
         },
-        async (progress) => {
+        async (progress, token) => {
           try {
+            // Check if user cancelled the notification
+            if (token.isCancellationRequested) {
+              console.log("[SqlExecutor] User dismissed progress notification");
+              return;
+            }
+
             // Send RUN_STARTED message
             this.queryCounter++;
             const sqlPreview = this.getSqlPreview(statements);
@@ -158,6 +164,12 @@ export class SqlExecutor {
             // Execute each statement
             let batchFailed = false;
             for (let i = 0; i < statements.length; i++) {
+              // Check if user cancelled the notification
+              if (token.isCancellationRequested) {
+                console.log("[SqlExecutor] User dismissed notification during execution");
+                break;
+              }
+
               const stmt = statements[i];
               const resultSetId = `${runId}-rs-${i}`;
 

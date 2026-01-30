@@ -94,6 +94,8 @@ export type ExtensionMessage =
   | { type: 'RECONNECT_STARTED'; payload: {} }
   | { type: 'RECONNECT_SUCCESS'; payload: { message?: string } }
   | { type: 'RECONNECT_ERROR'; payload: { message: string } }
+  | { type: 'DISCONNECT_SUCCESS'; payload: { message?: string } }
+  | { type: 'DISCONNECT_ERROR'; payload: { message: string } }
   | { type: 'RUN_STARTED'; payload: { runId: string; sql: string; title: string; startedAt: number } }
   | { type: 'RESULT_SET_PENDING'; payload: { runId: string; resultSetId: string; title: string; statementIndex?: number; sql?: string } }
   | { type: 'RESULT_SET_STARTED'; payload: { runId: string; resultSetId: string; title: string; statementIndex?: number; sql?: string } }
@@ -113,4 +115,5 @@ export type WebviewMessage =
   | { type: 'USER_SELECTED_RESULTSET'; payload: { runId: string; resultSetId: string } }
   | { type: 'USER_CLOSED_RUN'; payload: { runId: string } }
   | { type: 'USER_CANCELLED_RUN'; payload: { runId: string } }
-  | { type: 'USER_RECONNECT_DB' };
+  | { type: 'USER_RECONNECT_DB' }
+  | { type: 'USER_DISCONNECT_DB' };

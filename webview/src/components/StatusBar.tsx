@@ -10,6 +10,7 @@ type StatusBarProps = {
   onCancelQuery?: () => void;
   connectionStatus?: ConnectionStatus;
   onReconnect?: () => void;
+  onDisconnect?: () => void;
 };
 
 /**
@@ -18,7 +19,7 @@ type StatusBarProps = {
  * - Selection aggregates (sum, avg, max) when numeric cells are selected
  * - Settings gear icon for theme toggle
  * - Cancel button when query is running
- * - Reconnect button for connection errors
+ * - Reconnect and disconnect buttons for database connection management
  */
 export function StatusBar({ 
   resultSet, 
@@ -29,7 +30,8 @@ export function StatusBar({
   isQueryRunning, 
   onCancelQuery, 
   connectionStatus,
-  onReconnect 
+  onReconnect,
+  onDisconnect 
 }: StatusBarProps) {
   return (
     <div className="h-6 flex items-center justify-between px-3 border-t border-vscode-border bg-vscode-tab-inactive text-[11px]">
@@ -127,16 +129,33 @@ export function StatusBar({
           <span className="text-gray-500">Select cells to see aggregates</span>
         )}
 
-        {/* Reconnect button - show when connection error and not running query */}
-        {connectionStatus === 'error' && !isQueryRunning && onReconnect && (
-          <button
-            onClick={onReconnect}
-            className="flex items-center gap-1.5 px-2 py-0.5 text-[10px] bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
-            title="Reconnect to database"
-          >
-            <ReconnectIcon />
-            <span>Reconnect</span>
-          </button>
+        {/* Connection management buttons - show when not running query */}
+        {!isQueryRunning && (
+          <>
+            {/* Reconnect button - always available */}
+            {onReconnect && (
+              <button
+                onClick={onReconnect}
+                className="flex items-center gap-1.5 px-2 py-0.5 text-[10px] bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                title="Reconnect to database"
+              >
+                <ReconnectIcon />
+                <span>Reconnect</span>
+              </button>
+            )}
+            
+            {/* Disconnect button - show when connected or in error state */}
+            {(connectionStatus === 'connected' || connectionStatus === 'error') && onDisconnect && (
+              <button
+                onClick={onDisconnect}
+                className="flex items-center gap-1.5 px-2 py-0.5 text-[10px] bg-transparent hover:bg-red-600 text-white rounded transition-colors"
+                title="Disconnect from database"
+              >
+                <DisconnectIcon />
+                <span>Disconnect</span>
+              </button>
+            )}
+          </>
         )}
 
         {/* Theme toggle button */}
@@ -197,6 +216,20 @@ function ReconnectIcon() {
       <path d="M8 1a7 7 0 0 0-7 7h1a6 6 0 0 1 6-6V1zm0 14a7 7 0 0 0 7-7h-1a6 6 0 0 1-6 6v1z" />
       <path d="M4.5 8.5L3 7l-1.5 1.5L0 7l3-3 3 3-1.5 1.5L3 7l1.5 1.5z" />
       <path d="M11.5 7.5L13 9l1.5-1.5L16 9l-3 3-3-3 1.5-1.5L13 9l-1.5-1.5z" />
+    </svg>
+  );
+}
+
+function DisconnectIcon() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 16 16"
+      fill="currentColor"
+    >
+      <path d="M11 3h2v10h-2V3zM3 3h2v10H3V3z" />
+      <path d="M2 2h12v1H2V2zm0 11h12v1H2v-1z" />
     </svg>
   );
 }

@@ -293,7 +293,6 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(
         ref={containerRef}
         className="flex-1"
         style={{ minHeight: 0, overflow: 'auto' }} // Allow scrolling for table
-        tabIndex={0} // Make container focusable for keyboard events
       />
     );
   });

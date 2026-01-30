@@ -114,6 +114,12 @@ export function App() {
     });
   }, []);
 
+  const handleDisconnect = useCallback(() => {
+    postMessage({
+      type: 'USER_DISCONNECT_DB'
+    });
+  }, []);
+
   // Check if the active run has any running results
   const isQueryRunning = activeRun?.status === 'running';
 
@@ -220,6 +226,7 @@ export function App() {
         onCancelQuery={handleCancelQuery}
         connectionStatus={state.connectionStatus}
         onReconnect={handleReconnect}
+        onDisconnect={handleDisconnect}
       />
 
       {/* SQL Modal */}

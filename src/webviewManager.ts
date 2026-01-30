@@ -2,9 +2,9 @@
  * Manages webview panels for displaying SQL results
  */
 
-import * as vscode from 'vscode';
-import * as path from 'path';
-import * as fs from 'fs';
+import * as vscode from "vscode";
+import * as path from "path";
+import * as fs from "fs";
 
 export interface Column {
   name: string;
@@ -40,16 +40,18 @@ export class WebviewManager {
 
     // Create new panel
     panel = vscode.window.createWebviewPanel(
-      'sqlResults',
+      "sqlResults",
       `SQL Results: ${fileName}`,
       vscode.ViewColumn.Two,
       {
         enableScripts: true,
         retainContextWhenHidden: true,
         localResourceRoots: [
-          vscode.Uri.file(path.join(this.context.extensionPath, 'webview', 'dist'))
-        ]
-      }
+          vscode.Uri.file(
+            path.join(this.context.extensionPath, "webview", "dist"),
+          ),
+        ],
+      },
     );
 
     // Set HTML content
@@ -63,13 +65,17 @@ export class WebviewManager {
         }
       },
       null,
-      this.context.subscriptions
+      this.context.subscriptions,
     );
 
     // Handle panel disposal
-    panel.onDidDispose(() => {
-      this.panels.delete(fileUri);
-    }, null, this.context.subscriptions);
+    panel.onDidDispose(
+      () => {
+        this.panels.delete(fileUri);
+      },
+      null,
+      this.context.subscriptions,
+    );
 
     // Store panel
     this.panels.set(fileUri, panel);
@@ -84,8 +90,8 @@ export class WebviewManager {
     const panel = this.panels.get(fileUri);
     if (panel) {
       panel.webview.postMessage({
-        type: 'CONNECTION_STARTED',
-        payload: {}
+        type: "CONNECTION_STARTED",
+        payload: {},
       });
     }
   }
@@ -97,8 +103,8 @@ export class WebviewManager {
     const panel = this.panels.get(fileUri);
     if (panel) {
       panel.webview.postMessage({
-        type: 'CONNECTION_SUCCESS',
-        payload: { message }
+        type: "CONNECTION_SUCCESS",
+        payload: { message },
       });
     }
   }
@@ -110,8 +116,8 @@ export class WebviewManager {
     const panel = this.panels.get(fileUri);
     if (panel) {
       panel.webview.postMessage({
-        type: 'CONNECTION_ERROR',
-        payload: { message }
+        type: "CONNECTION_ERROR",
+        payload: { message },
       });
     }
   }
@@ -123,8 +129,8 @@ export class WebviewManager {
     const panel = this.panels.get(fileUri);
     if (panel) {
       panel.webview.postMessage({
-        type: 'RECONNECT_STARTED',
-        payload: {}
+        type: "RECONNECT_STARTED",
+        payload: {},
       });
     }
   }
@@ -136,8 +142,8 @@ export class WebviewManager {
     const panel = this.panels.get(fileUri);
     if (panel) {
       panel.webview.postMessage({
-        type: 'RECONNECT_SUCCESS',
-        payload: { message }
+        type: "RECONNECT_SUCCESS",
+        payload: { message },
       });
     }
   }
@@ -149,8 +155,34 @@ export class WebviewManager {
     const panel = this.panels.get(fileUri);
     if (panel) {
       panel.webview.postMessage({
-        type: 'RECONNECT_ERROR',
-        payload: { message }
+        type: "RECONNECT_ERROR",
+        payload: { message },
+      });
+    }
+  }
+
+  /**
+   * Send DISCONNECT_SUCCESS message
+   */
+  sendDisconnectSuccess(fileUri: string, message?: string) {
+    const panel = this.panels.get(fileUri);
+    if (panel) {
+      panel.webview.postMessage({
+        type: "DISCONNECT_SUCCESS",
+        payload: { message },
+      });
+    }
+  }
+
+  /**
+   * Send DISCONNECT_ERROR message
+   */
+  sendDisconnectError(fileUri: string, message: string) {
+    const panel = this.panels.get(fileUri);
+    if (panel) {
+      panel.webview.postMessage({
+        type: "DISCONNECT_ERROR",
+        payload: { message },
       });
     }
   }
@@ -158,22 +190,17 @@ export class WebviewManager {
   /**
    * Send RUN_STARTED message
    */
-  sendRunStarted(
-    fileUri: string,
-    runId: string,
-    sql: string,
-    title: string
-  ) {
+  sendRunStarted(fileUri: string, runId: string, sql: string, title: string) {
     const panel = this.panels.get(fileUri);
     if (panel) {
       panel.webview.postMessage({
-        type: 'RUN_STARTED',
+        type: "RUN_STARTED",
         payload: {
           runId,
           sql,
           title,
-          startedAt: Date.now()
-        }
+          startedAt: Date.now(),
+        },
       });
     }
   }
@@ -187,19 +214,19 @@ export class WebviewManager {
     resultSetId: string,
     title: string,
     statementIndex: number,
-    sql?: string
+    sql?: string,
   ) {
     const panel = this.panels.get(fileUri);
     if (panel) {
       panel.webview.postMessage({
-        type: 'RESULT_SET_PENDING',
+        type: "RESULT_SET_PENDING",
         payload: {
           runId,
           resultSetId,
           title,
           statementIndex,
-          sql
-        }
+          sql,
+        },
       });
     }
   }
@@ -213,19 +240,19 @@ export class WebviewManager {
     resultSetId: string,
     title: string,
     statementIndex: number,
-    sql?: string
+    sql?: string,
   ) {
     const panel = this.panels.get(fileUri);
     if (panel) {
       panel.webview.postMessage({
-        type: 'RESULT_SET_STARTED',
+        type: "RESULT_SET_STARTED",
         payload: {
           runId,
           resultSetId,
           title,
           statementIndex,
-          sql
-        }
+          sql,
+        },
       });
     }
   }
@@ -237,7 +264,7 @@ export class WebviewManager {
     fileUri: string,
     runId: string,
     resultSetId: string,
-    columns: Column[]
+    columns: Column[],
   ) {
     const panel = this.panels.get(fileUri);
     console.log("[DEBUG] WebviewManager.sendResultSetSchema:", {
@@ -246,16 +273,16 @@ export class WebviewManager {
       resultSetId,
       columnsLength: columns.length,
       columns,
-      panelExists: !!panel
+      panelExists: !!panel,
     });
     if (panel) {
       panel.webview.postMessage({
-        type: 'RESULT_SET_SCHEMA',
+        type: "RESULT_SET_SCHEMA",
         payload: {
           runId,
           resultSetId,
-          columns
-        }
+          columns,
+        },
       });
     }
   }
@@ -268,7 +295,7 @@ export class WebviewManager {
     runId: string,
     resultSetId: string,
     rows: any[],
-    append: boolean = false
+    append: boolean = false,
   ) {
     const panel = this.panels.get(fileUri);
     console.log("[DEBUG] WebviewManager.sendResultSetRows:", {
@@ -278,17 +305,17 @@ export class WebviewManager {
       rowsLength: rows.length,
       firstRow: rows[0],
       append,
-      panelExists: !!panel
+      panelExists: !!panel,
     });
     if (panel) {
       panel.webview.postMessage({
-        type: 'RESULT_SET_ROWS',
+        type: "RESULT_SET_ROWS",
         payload: {
           runId,
           resultSetId,
           rows,
-          append
-        }
+          append,
+        },
       });
     }
   }
@@ -301,18 +328,18 @@ export class WebviewManager {
     runId: string,
     resultSetId: string,
     rowCount: number,
-    executionTimeMs: number
+    executionTimeMs: number,
   ) {
     const panel = this.panels.get(fileUri);
     if (panel) {
       panel.webview.postMessage({
-        type: 'RESULT_SET_COMPLETE',
+        type: "RESULT_SET_COMPLETE",
         payload: {
           runId,
           resultSetId,
           rowCount,
-          executionTimeMs
-        }
+          executionTimeMs,
+        },
       });
     }
   }
@@ -330,18 +357,18 @@ export class WebviewManager {
       details?: any;
       rawError?: string;
       traceback?: string;
-    }
+    },
   ) {
     const panel = this.panels.get(fileUri);
     if (panel) {
       panel.webview.postMessage({
-        type: 'RESULT_SET_ERROR',
+        type: "RESULT_SET_ERROR",
         payload: {
           runId,
           resultSetId,
           message: error.message, // For backward compatibility
-          error: error // Structured error
-        }
+          error: error, // Structured error
+        },
       });
     }
   }
@@ -353,8 +380,8 @@ export class WebviewManager {
     const panel = this.panels.get(fileUri);
     if (panel) {
       panel.webview.postMessage({
-        type: 'RUN_COMPLETE',
-        payload: { runId }
+        type: "RUN_COMPLETE",
+        payload: { runId },
       });
     }
   }
@@ -366,11 +393,11 @@ export class WebviewManager {
     const panel = this.panels.get(fileUri);
     if (panel) {
       panel.webview.postMessage({
-        type: 'RUN_ERROR',
+        type: "RUN_ERROR",
         payload: {
           runId,
-          message
-        }
+          message,
+        },
       });
     }
   }
@@ -382,8 +409,8 @@ export class WebviewManager {
     const panel = this.panels.get(fileUri);
     if (panel) {
       panel.webview.postMessage({
-        type: 'RUN_CANCELLED',
-        payload: { runId }
+        type: "RUN_CANCELLED",
+        payload: { runId },
       });
     }
   }
@@ -391,19 +418,15 @@ export class WebviewManager {
   /**
    * Send RESULT_SET_CANCELLED message
    */
-  sendResultSetCancelled(
-    fileUri: string,
-    runId: string,
-    resultSetId: string
-  ) {
+  sendResultSetCancelled(fileUri: string, runId: string, resultSetId: string) {
     const panel = this.panels.get(fileUri);
     if (panel) {
       panel.webview.postMessage({
-        type: 'RESULT_SET_CANCELLED',
+        type: "RESULT_SET_CANCELLED",
         payload: {
           runId,
-          resultSetId
-        }
+          resultSetId,
+        },
       });
     }
   }
@@ -412,14 +435,16 @@ export class WebviewManager {
    * Generate HTML content for the webview
    */
   private getWebviewContent(webview: vscode.Webview): string {
-    const distPath = path.join(this.context.extensionPath, 'webview', 'dist');
+    const distPath = path.join(this.context.extensionPath, "webview", "dist");
 
     // Check if built files exist
-    const jsPath = path.join(distPath, 'webview.js');
-    const cssPath = path.join(distPath, 'webview.css');
+    const jsPath = path.join(distPath, "webview.js");
+    const cssPath = path.join(distPath, "webview.css");
 
     if (!fs.existsSync(jsPath)) {
-      return this.getErrorHtml('Webview not built. Run: cd webview && npm install && npm run build');
+      return this.getErrorHtml(
+        "Webview not built. Run: cd webview && npm install && npm run build",
+      );
     }
 
     const scriptUri = webview.asWebviewUri(vscode.Uri.file(jsPath));
@@ -493,7 +518,7 @@ export class WebviewManager {
    * Close all panels
    */
   closeAllPanels() {
-    this.panels.forEach(panel => panel.dispose());
+    this.panels.forEach((panel) => panel.dispose());
     this.panels.clear();
   }
 }

@@ -95,6 +95,21 @@ export function reducer(state: AppState, action: Action): AppState {
       };
     }
 
+    case 'DISCONNECT_SUCCESS': {
+      return {
+        ...state,
+        connectionStatus: 'idle',
+        connectionError: undefined,
+      };
+    }
+
+    case 'DISCONNECT_ERROR': {
+      return {
+        ...state,
+        connectionError: action.payload.message,
+      };
+    }
+
     // -------------------------------------------------------------------------
     // Run lifecycle
     // -------------------------------------------------------------------------

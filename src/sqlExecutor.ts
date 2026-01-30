@@ -37,6 +37,9 @@ export class SqlExecutor {
       case "USER_RECONNECT_DB":
         this.reconnectDatabase();
         break;
+      case "USER_DISCONNECT_DB":
+        this.disconnectDatabase();
+        break;
       // Other message types can be added here if needed
     }
   }
@@ -105,17 +108,17 @@ export class SqlExecutor {
       try {
         // Notify webview that connection is starting
         this.webviewManager.sendConnectionStarted(fileUri);
-        
+
         session = await this.sessionManager.getOrCreateSession(fileUri);
-        
+
         // Notify webview that connection succeeded
         this.webviewManager.sendConnectionSuccess(fileUri);
       } catch (error: any) {
         this.runningQueries.delete(runId);
-        
+
         // Notify webview of connection error
         this.webviewManager.sendConnectionError(fileUri, error.message);
-        
+
         vscode.window.showErrorMessage(
           `Failed to create database session: ${error.message}`,
         );
@@ -166,7 +169,9 @@ export class SqlExecutor {
             for (let i = 0; i < statements.length; i++) {
               // Check if user cancelled the notification
               if (token.isCancellationRequested) {
-                console.log("[SqlExecutor] User dismissed notification during execution");
+                console.log(
+                  "[SqlExecutor] User dismissed notification during execution",
+                );
                 break;
               }
 
@@ -207,7 +212,7 @@ export class SqlExecutor {
                       i,
                       stmt.sql,
                     );
-                  }
+                  },
                 );
 
                 // DEBUG: Log the result received by SqlExecutor
@@ -232,11 +237,11 @@ export class SqlExecutor {
                       details: result.errorDetails,
                       rawError: result.rawError,
                       traceback: result.traceback,
-                    }
+                    },
                   );
                   // Remove from running result sets
                   this.runningResultSets.get(runId)?.delete(resultSetId);
-                  
+
                   // Mark batch as failed - downstream queries in this batch will be cancelled
                   batchFailed = true;
                   continue;
@@ -323,11 +328,11 @@ export class SqlExecutor {
                     message: error.message || "Unknown error",
                     type: "Execution Error",
                     rawError: error.stack || error.toString(),
-                  }
+                  },
                 );
                 // Remove from running result sets
                 this.runningResultSets.get(runId)?.delete(resultSetId);
-                
+
                 // Mark batch as failed - downstream queries in this batch will be cancelled
                 batchFailed = true;
               }
@@ -398,26 +403,64 @@ export class SqlExecutor {
         // Notify webview of success
         this.webviewManager.sendReconnectSuccess(fileUri, result.message);
         vscode.window.showInformationMessage(
-          result.message || "Successfully reconnected to database"
+          result.message || "Successfully reconnected to database",
         );
       } else {
         // Notify webview of error
         this.webviewManager.sendReconnectError(
           fileUri,
-          result.error || "Reconnection failed"
+          result.error || "Reconnection failed",
         );
         vscode.window.showErrorMessage(
-          `Reconnection failed: ${result.error || "Unknown error"}`
+          `Reconnection failed: ${result.error || "Unknown error"}`,
         );
       }
     } catch (error: any) {
       const fileUri = editor.document.uri.toString();
       this.webviewManager.sendReconnectError(
         fileUri,
-        error.message || "Unexpected error during reconnection"
+        error.message || "Unexpected error during reconnection",
       );
       vscode.window.showErrorMessage(
-        `Reconnection failed: ${error.message || "Unknown error"}`
+        `Reconnection failed: ${error.message || "Unknown error"}`,
+      );
+    }
+  }
+
+  /**
+   * Disconnect from the database
+   */
+  async disconnectDatabase() {
+    const editor = vscode.window.activeTextEditor;
+
+    if (!editor) {
+      vscode.window.showErrorMessage("No active editor");
+      return;
+    }
+
+    const fileUri = editor.document.uri.toString();
+
+    try {
+      // Close the session
+      await this.sessionManager.closeSession(fileUri);
+
+      // Notify webview of successful disconnection
+      this.webviewManager.sendDisconnectSuccess(
+        fileUri,
+        "Successfully disconnected from database",
+      );
+
+      vscode.window.showInformationMessage(
+        "Successfully disconnected from database",
+      );
+    } catch (error: any) {
+      // Notify webview of disconnection error
+      this.webviewManager.sendDisconnectError(
+        fileUri,
+        error.message || "Disconnection failed",
+      );
+      vscode.window.showErrorMessage(
+        `Disconnection failed: ${error.message || "Unknown error"}`,
       );
     }
   }

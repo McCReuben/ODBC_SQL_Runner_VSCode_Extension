@@ -46,6 +46,14 @@
       {
         "command": "sqlRunner.showMetadataStats",
         "title": "SQL Runner: Show Metadata Statistics"
+      },
+      {
+        "command": "sqlRunner.editSchemasConfig",
+        "title": "SQL Runner: Edit Schemas to Scan"
+      },
+      {
+        "command": "sqlRunner.editTablesConfig",
+        "title": "SQL Runner: Edit Tables to Include"
       }
     ],
     "keybindings": [
@@ -96,26 +104,10 @@
           "default": "ACCESS_VIEWS",
           "description": "Default schema to use for unqualified table references"
         },
-        "sqlRunner.intellisense.allowedSchemas": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "default": ["ACCESS_VIEWS"],
-          "description": "List of schemas to track for Intellisense. Schemas are automatically added when referenced in executed queries."
-        },
-        "sqlRunner.intellisense.allowedTables": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "default": [],
-          "description": "List of specific tables to track (format: 'schema.table'). Tables are automatically added when referenced in executed queries."
-        },
         "sqlRunner.intellisense.autoExpandFromQueries": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically add schemas and tables to the allow-list when they are referenced in executed queries"
+          "description": "Automatically discover tables when they are referenced in executed queries"
         },
         "sqlRunner.intellisense.autoRefreshIntervalMs": {
           "type": "number",
@@ -130,7 +122,7 @@
         "sqlRunner.intellisense.maxTablesPerSchema": {
           "type": "number",
           "default": 1000,
-          "description": "Maximum number of tables to load per schema (to avoid overwhelming large schemas)"
+          "description": "Maximum number of tables to load per schema"
         }
       }
     },
@@ -142,6 +134,14 @@
         },
         {
           "command": "sqlRunner.showMetadataStats",
+          "when": "editorLangId == sql"
+        },
+        {
+          "command": "sqlRunner.editSchemasConfig",
+          "when": "editorLangId == sql"
+        },
+        {
+          "command": "sqlRunner.editTablesConfig",
           "when": "editorLangId == sql"
         }
       ]

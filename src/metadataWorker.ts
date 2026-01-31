@@ -82,6 +82,12 @@ export class MetadataWorker implements vscode.Disposable {
       // Queue column refresh for newly added tables
       this.queueRequest({ type: "columns", schema, table });
     });
+    
+    // Listen for config file changes to trigger refresh
+    this.metadataStore.onConfigChanged(() => {
+      console.log("[MetadataWorker] Config changed, scheduling refresh...");
+      this.forceRefreshAll();
+    });
   }
 
   /**
@@ -108,8 +114,8 @@ export class MetadataWorker implements vscode.Disposable {
       this.startAutoRefresh();
       this.setState("idle");
       
-      // Initial refresh of schemas
-      this.queueRequest({ type: "schemas" });
+      // Initial scan of configured schemas
+      this.forceRefreshAll();
       
       console.log("[MetadataWorker] Started successfully");
     } catch (error: any) {
@@ -224,12 +230,9 @@ export class MetadataWorker implements vscode.Disposable {
    * Schedule a full refresh cycle
    */
   scheduleRefreshCycle(): void {
-    // Queue schema refresh
-    this.queueRequest({ type: "schemas" });
-    
-    // Queue table refresh for schemas needing refresh
-    const schemasToRefresh = this.metadataStore.getSchemasNeedingRefresh(this.autoRefreshIntervalMs);
-    for (const schema of schemasToRefresh) {
+    // Queue table scan for schemas that are configured to be scanned
+    const schemasToScan = this.metadataStore.getSchemasNeedingTableScan(this.autoRefreshIntervalMs);
+    for (const schema of schemasToScan) {
       this.queueRequest({ type: "tables", schema });
     }
     
@@ -237,6 +240,16 @@ export class MetadataWorker implements vscode.Disposable {
     const tablesToRefresh = this.metadataStore.getTablesNeedingColumnRefresh(this.autoRefreshIntervalMs);
     for (const { schema, table } of tablesToRefresh) {
       this.queueRequest({ type: "columns", schema, table });
+    }
+  }
+
+  /**
+   * Force refresh all configured schemas (ignore age)
+   */
+  forceRefreshAll(): void {
+    const schemasToScan = this.metadataStore.getSchemasToScan();
+    for (const schema of schemasToScan) {
+      this.queueRequest({ type: "tables", schema });
     }
   }
 
@@ -354,47 +367,13 @@ export class MetadataWorker implements vscode.Disposable {
 
   /**
    * Fetch available schemas (databases)
+   * Note: We no longer use SHOW DATABASES since there are too many schemas.
+   * Instead, schemas are configured via schemas.txt file.
    */
   private async fetchSchemas(): Promise<void> {
-    console.log("[MetadataWorker] Fetching schemas...");
-    
-    const result = await this.pythonRunner!.executeQuery(
-      "SHOW DATABASES",
-      "metadata-schemas",
-      undefined,
-      100 // Limit to 100 schemas initially
-    );
-    
-    if (!result.success) {
-      console.error("[MetadataWorker] Failed to fetch schemas:", result.error);
-      return;
-    }
-    
-    if (!result.rows || result.rows.length === 0) {
-      console.log("[MetadataWorker] No schemas returned");
-      return;
-    }
-    
-    // SHOW DATABASES typically returns a "databaseName" or "namespace" column
-    const schemaColumn = result.columns?.find(
-      (c) => c.name.toLowerCase().includes("database") || c.name.toLowerCase().includes("namespace")
-    );
-    
-    const columnName = schemaColumn?.name || Object.keys(result.rows[0])[0];
-    
-    for (const row of result.rows) {
-      const schemaName = row[columnName];
-      if (schemaName) {
-        // Add schema if it's in the allow-list or was auto-discovered
-        const existingSchema = this.metadataStore.getSchema(schemaName);
-        if (existingSchema) {
-          // Update existing schema
-          this.metadataStore.addSchema(schemaName, existingSchema.isFromAllowList);
-        }
-      }
-    }
-    
-    console.log(`[MetadataWorker] Fetched ${result.rows.length} schemas`);
+    // This method is kept for compatibility but is no longer actively used.
+    // Schemas are managed via the schemas.txt configuration file.
+    console.log("[MetadataWorker] fetchSchemas called - schemas are now managed via config files");
   }
 
   /**
@@ -403,11 +382,15 @@ export class MetadataWorker implements vscode.Disposable {
   private async fetchTables(schemaName: string): Promise<void> {
     console.log(`[MetadataWorker] Fetching tables for schema: ${schemaName}`);
     
+    // Get max tables from config
+    const config = vscode.workspace.getConfiguration("sqlRunner.intellisense");
+    const maxTables = config.get<number>("maxTablesPerSchema", 1000);
+    
     const result = await this.pythonRunner!.executeQuery(
       `SHOW TABLES IN ${schemaName}`,
       `metadata-tables-${schemaName}`,
       undefined,
-      1000 // Limit to 1000 tables
+      maxTables
     );
     
     if (!result.success) {
@@ -417,6 +400,8 @@ export class MetadataWorker implements vscode.Disposable {
     
     if (!result.rows || result.rows.length === 0) {
       console.log(`[MetadataWorker] No tables found in ${schemaName}`);
+      // Update schema refresh time even if no tables
+      this.metadataStore.addSchema(schemaName, "scanned");
       return;
     }
     
@@ -427,19 +412,28 @@ export class MetadataWorker implements vscode.Disposable {
     
     const columnName = tableColumn?.name || Object.keys(result.rows[0])[0];
     
+    // Determine if this schema is configured to be scanned
+    const isScannedSchema = this.metadataStore.shouldScanSchema(schemaName);
+    const source = isScannedSchema ? "scanned" : "auto-discovered";
+    
+    let addedCount = 0;
     for (const row of result.rows) {
       const tableName = row[columnName];
       if (tableName) {
         // Check if table already exists
         const existingTable = this.metadataStore.getTable(schemaName, tableName);
         if (!existingTable) {
-          // Add new table (will be marked as auto-discovered)
-          this.metadataStore.addTable(schemaName, tableName, [], false);
+          // Add new table with appropriate source
+          this.metadataStore.addTable(schemaName, tableName, [], source);
+          addedCount++;
         }
       }
     }
     
-    console.log(`[MetadataWorker] Fetched ${result.rows.length} tables for ${schemaName}`);
+    // Update schema refresh timestamp
+    this.metadataStore.addSchema(schemaName, source);
+    
+    console.log(`[MetadataWorker] Fetched ${result.rows.length} tables for ${schemaName} (${addedCount} new)`);
   }
 
   /**

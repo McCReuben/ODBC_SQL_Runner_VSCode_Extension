@@ -110,7 +110,7 @@ export function activate(context: vscode.ExtensionContext) {
     async () => {
       if (metadataWorker) {
         vscode.window.showInformationMessage("Refreshing schema metadata...");
-        metadataWorker.scheduleRefreshCycle();
+        metadataWorker.forceRefreshAll();
       }
     }
   );
@@ -125,10 +125,31 @@ export function activate(context: vscode.ExtensionContext) {
         const queueLength = metadataWorker?.getQueueLength() || 0;
 
         vscode.window.showInformationMessage(
-          `Metadata Stats: ${stats.totalSchemas} schemas, ${stats.totalTables} tables (${stats.tablesWithColumns} with columns). ` +
+          `Metadata: ${stats.totalSchemas} schemas, ${stats.totalTables} tables (${stats.tablesWithColumns} with columns). ` +
+          `Configured: ${stats.schemasToScan} schemas to scan, ${stats.configuredTables} specific tables. ` +
           `Auto-discovered: ${stats.autoDiscoveredSchemas} schemas, ${stats.autoDiscoveredTables} tables. ` +
           `Worker: ${workerState}, Queue: ${queueLength}`
         );
+      }
+    }
+  );
+
+  // Register command: Edit schemas config file
+  const editSchemasConfigCommand = vscode.commands.registerCommand(
+    "sqlRunner.editSchemasConfig",
+    async () => {
+      if (metadataStore) {
+        await metadataStore.openSchemasFile();
+      }
+    }
+  );
+
+  // Register command: Edit tables config file
+  const editTablesConfigCommand = vscode.commands.registerCommand(
+    "sqlRunner.editTablesConfig",
+    async () => {
+      if (metadataStore) {
+        await metadataStore.openTablesFile();
       }
     }
   );
@@ -141,6 +162,8 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(copyStatementCommand);
   context.subscriptions.push(refreshMetadataCommand);
   context.subscriptions.push(showMetadataStatsCommand);
+  context.subscriptions.push(editSchemasConfigCommand);
+  context.subscriptions.push(editTablesConfigCommand);
 
   // Cleanup on deactivation
   context.subscriptions.push({

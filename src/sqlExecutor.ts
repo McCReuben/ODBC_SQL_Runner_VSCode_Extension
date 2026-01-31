@@ -17,6 +17,7 @@ export class SqlExecutor {
   private metadataStore: SchemaMetadataStore | null;
   private runningQueries: Map<string, string> = new Map(); // runId -> fileUri
   private runningResultSets: Map<string, Set<string>> = new Map(); // runId -> Set<resultSetId>
+  private cancelledRuns: Set<string> = new Set(); // Track cancelled runIds
   private queryCounter: number = 0; // Incremental counter for query numbers
   private defaultSchema: string = "ACCESS_VIEWS";
 
@@ -179,6 +180,14 @@ export class SqlExecutor {
             // Execute each statement
             let batchFailed = false;
             for (let i = 0; i < statements.length; i++) {
+              // Check if query was cancelled by user
+              if (this.cancelledRuns.has(runId)) {
+                console.log(
+                  "[SqlExecutor] Query was cancelled, stopping execution",
+                );
+                break;
+              }
+
               // Check if user cancelled the notification
               if (token.isCancellationRequested) {
                 console.log(
@@ -381,12 +390,14 @@ export class SqlExecutor {
             // Remove from running queries
             this.runningQueries.delete(runId);
             this.runningResultSets.delete(runId);
+            this.cancelledRuns.delete(runId);
           }
         },
       );
     } catch (error: any) {
       this.runningQueries.delete(runId);
       this.runningResultSets.delete(runId);
+      this.cancelledRuns.delete(runId);
       vscode.window.showErrorMessage(`Unexpected error: ${error.message}`);
       console.error("SQL execution error:", error);
     }
@@ -485,7 +496,7 @@ export class SqlExecutor {
   /**
    * Cancel a running query
    */
-  cancelQuery(runId: string) {
+  async cancelQuery(runId: string) {
     const fileUri = this.runningQueries.get(runId);
     if (!fileUri) {
       console.log(`[SqlExecutor] No running query found with runId: ${runId}`);
@@ -494,28 +505,34 @@ export class SqlExecutor {
 
     console.log(`[SqlExecutor] Cancelling query ${runId} for file ${fileUri}`);
 
-    // Cancel the session (kills Python process)
-    this.sessionManager.cancelSession(fileUri);
+    // Mark this run as cancelled
+    this.cancelledRuns.add(runId);
 
-    // Send cancellation messages to webview
-    // First, cancel any running result sets
-    const runningResultSetIds = this.runningResultSets.get(runId);
-    if (runningResultSetIds) {
-      runningResultSetIds.forEach((resultSetId) => {
-        this.webviewManager.sendResultSetCancelled(fileUri, runId, resultSetId);
-      });
+    try {
+      // Cancel the session gracefully (without killing the process)
+      await this.sessionManager.cancelSession(fileUri);
+
+      // Send cancellation messages to webview
+      // First, cancel any running result sets
+      const runningResultSetIds = this.runningResultSets.get(runId);
+      if (runningResultSetIds) {
+        runningResultSetIds.forEach((resultSetId) => {
+          this.webviewManager.sendResultSetCancelled(fileUri, runId, resultSetId);
+        });
+      }
+
+      // Then send run cancelled message
+      this.webviewManager.sendRunCancelled(fileUri, runId);
+
+      vscode.window.showInformationMessage(
+        "Query cancelled. Database session remains active.",
+      );
+    } catch (error: any) {
+      console.error("[SqlExecutor] Failed to cancel query:", error);
+      vscode.window.showErrorMessage(
+        `Failed to cancel query: ${error.message}`,
+      );
     }
-
-    // Then send run cancelled message
-    this.webviewManager.sendRunCancelled(fileUri, runId);
-
-    // Remove from running queries
-    this.runningQueries.delete(runId);
-    this.runningResultSets.delete(runId);
-
-    vscode.window.showWarningMessage(
-      "Query cancelled. Session will be recreated on next execution.",
-    );
   }
 
   /**
@@ -679,6 +696,12 @@ export class SqlExecutor {
         },
         async (progress, token) => {
           try {
+            // Check if query was cancelled by user
+            if (this.cancelledRuns.has(runId)) {
+              console.log("[SqlExecutor] Query was cancelled before execution");
+              return;
+            }
+
             if (token.isCancellationRequested) {
               return;
             }
@@ -801,12 +824,14 @@ export class SqlExecutor {
           } finally {
             this.runningQueries.delete(runId);
             this.runningResultSets.delete(runId);
+            this.cancelledRuns.delete(runId);
           }
         }
       );
     } catch (error: any) {
       this.runningQueries.delete(runId);
       this.runningResultSets.delete(runId);
+      this.cancelledRuns.delete(runId);
       vscode.window.showErrorMessage(`Unexpected error: ${error.message}`);
       console.error("SQL execution error:", error);
     }
@@ -868,6 +893,12 @@ export class SqlExecutor {
         },
         async (progress, token) => {
           try {
+            // Check if query was cancelled by user
+            if (this.cancelledRuns.has(runId)) {
+              console.log("[SqlExecutor] Query was cancelled before execution");
+              return;
+            }
+
             if (token.isCancellationRequested) {
               return;
             }
@@ -992,12 +1023,14 @@ export class SqlExecutor {
           } finally {
             this.runningQueries.delete(runId);
             this.runningResultSets.delete(runId);
+            this.cancelledRuns.delete(runId);
           }
         }
       );
     } catch (error: any) {
       this.runningQueries.delete(runId);
       this.runningResultSets.delete(runId);
+      this.cancelledRuns.delete(runId);
       vscode.window.showErrorMessage(`Unexpected error: ${error.message}`);
       console.error("Describe table error:", error);
     }
@@ -1097,6 +1130,12 @@ export class SqlExecutor {
         },
         async (progress, token) => {
           try {
+            // Check if query was cancelled by user
+            if (this.cancelledRuns.has(runId)) {
+              console.log("[SqlExecutor] Query was cancelled before execution");
+              return;
+            }
+
             if (token.isCancellationRequested) {
               return;
             }
@@ -1249,12 +1288,14 @@ export class SqlExecutor {
           } finally {
             this.runningQueries.delete(runId);
             this.runningResultSets.delete(runId);
+            this.cancelledRuns.delete(runId);
           }
         }
       );
     } catch (error: any) {
       this.runningQueries.delete(runId);
       this.runningResultSets.delete(runId);
+      this.cancelledRuns.delete(runId);
       vscode.window.showErrorMessage(`Unexpected error: ${error.message}`);
       console.error("Export query error:", error);
     }

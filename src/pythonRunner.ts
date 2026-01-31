@@ -209,6 +209,9 @@ export class PythonRunner {
           console.log("Sending EXECUTE command for SQL:", command.sql);
           responseType = "EXECUTE_RESULT";
           break;
+        case "CANCEL":
+          responseType = "CANCEL_RESULT";
+          break;
         case "CLOSE":
           responseType = "CLOSE_RESULT";
           break;
@@ -346,8 +349,28 @@ export class PythonRunner {
   }
 
   /**
-   * Cancel/kill the running Python process immediately
+   * Cancel the currently executing query gracefully without terminating the session
+   */
+  async cancelQuery(): Promise<void> {
+    if (!this.isExecutingQuery) {
+      console.log("[PythonRunner] No query currently executing");
+      return;
+    }
+
+    try {
+      console.log("[PythonRunner] Sending CANCEL command to gracefully stop query");
+      const response = await this.sendCommand({ type: "CANCEL" });
+      console.log("[PythonRunner] Cancel response:", response.payload);
+    } catch (error) {
+      console.error("[PythonRunner] Failed to cancel query:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Kill the running Python process immediately (DEPRECATED - use cancelQuery instead)
    * This will terminate any running query and lose session state
+   * Only use this for cleanup on extension deactivation
    */
   cancel(): void {
     // Clear all pending queries from the queue
@@ -433,11 +456,21 @@ export class SessionManager {
   }
 
   /**
-   * Cancel the running query for a session by killing the Python process
-   * The session will be removed and recreated on next query
-   * WARNING: This will lose session state (temporary tables, etc.)
+   * Cancel the running query for a session gracefully without losing the connection
    */
-  cancelSession(fileUri: string): void {
+  async cancelSession(fileUri: string): Promise<void> {
+    const session = this.sessions.get(fileUri);
+    if (session) {
+      await session.cancelQuery();
+    }
+  }
+
+  /**
+   * Kill the session process (DEPRECATED - use cancelSession for graceful cancellation)
+   * This will lose session state (temporary tables, etc.)
+   * Only use this for cleanup on extension deactivation
+   */
+  killSession(fileUri: string): void {
     const session = this.sessions.get(fileUri);
     if (session) {
       session.cancel();

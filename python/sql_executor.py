@@ -229,6 +229,10 @@ class SqlExecutor:
         self.heartbeat_stop_event: threading.Event = threading.Event()
         self.heartbeat_interval: int = 120  # Send heartbeat every 2 minutes
         self.heartbeat_lock: threading.Lock = threading.Lock()  # Protect cursor access
+        
+        # Query cancellation support
+        self.is_cancelled: bool = False
+        self.current_result_set_id: Optional[str] = None
 
     def connect(self) -> Dict[str, Any]:
         """Establish ODBC connection"""
@@ -311,12 +315,28 @@ class SqlExecutor:
             }
 
         start_time = time.time()
+        
+        # Track current query and reset cancellation flag
+        self.current_result_set_id = result_set_id
+        self.is_cancelled = False
 
         try:
             # Execute the SQL (with lock to prevent heartbeat interference)
             with self.heartbeat_lock:
                 self.cursor.execute(sql)
                 self.last_activity_time = time.time()  # Update activity time
+                
+                # Check if query was cancelled during execution
+                if self.is_cancelled:
+                    execution_time_ms = int((time.time() - start_time) * 1000)
+                    return {
+                        "success": False,
+                        "resultSetId": result_set_id,
+                        "error": "Query was cancelled",
+                        "errorType": "Cancelled",
+                        "executionTimeMs": execution_time_ms,
+                        "cancelled": True
+                    }
 
                 # Check if this query returns results
                 if self.cursor.description is None:
@@ -325,6 +345,9 @@ class SqlExecutor:
 
                     # Get affected rows if available
                     row_count = self.cursor.rowcount if self.cursor.rowcount != -1 else 0
+                    
+                    # Clear current result set tracking
+                    self.current_result_set_id = None
 
                     return {
                         "success": True,
@@ -368,6 +391,9 @@ class SqlExecutor:
                     row_count += 1
 
             execution_time_ms = int((time.time() - start_time) * 1000)
+            
+            # Clear current result set tracking
+            self.current_result_set_id = None
 
             return {
                 "success": True,
@@ -381,6 +407,9 @@ class SqlExecutor:
 
         except Exception as e:
             execution_time_ms = int((time.time() - start_time) * 1000)
+            
+            # Clear current result set tracking
+            self.current_result_set_id = None
             
             # Parse the error to extract user-friendly message
             error_str = str(e)
@@ -449,6 +478,35 @@ class SqlExecutor:
                 "traceback": traceback.format_exc()
             }
 
+    def cancel_query(self) -> Dict[str, Any]:
+        """Cancel the currently executing query without closing the connection"""
+        try:
+            # Set cancellation flag
+            self.is_cancelled = True
+            
+            # Try to cancel the cursor's current operation
+            if self.cursor:
+                try:
+                    self.cursor.cancel()
+                    print("[DEBUG] Query cancellation requested via cursor.cancel()", file=sys.stderr)
+                except AttributeError:
+                    # Some drivers don't support cancel()
+                    print("[DEBUG] cursor.cancel() not supported by driver", file=sys.stderr)
+                except Exception as e:
+                    print(f"[DEBUG] cursor.cancel() failed: {str(e)}", file=sys.stderr)
+            
+            return {
+                "success": True,
+                "message": "Query cancellation requested",
+                "resultSetId": self.current_result_set_id
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "traceback": traceback.format_exc()
+            }
+    
     def close(self):
         """Close the connection"""
         # Stop heartbeat thread first
@@ -525,6 +583,23 @@ def main():
                     result = executor.reconnect()
                     send_message({
                         "type": "RECONNECT_RESULT",
+                        "payload": result
+                    })
+
+                elif command_type == "CANCEL":
+                    if not executor:
+                        send_message({
+                            "type": "CANCEL_RESULT",
+                            "payload": {
+                                "success": False,
+                                "error": "No executor instance available"
+                            }
+                        })
+                        continue
+                    
+                    result = executor.cancel_query()
+                    send_message({
+                        "type": "CANCEL_RESULT",
                         "payload": result
                     })
 

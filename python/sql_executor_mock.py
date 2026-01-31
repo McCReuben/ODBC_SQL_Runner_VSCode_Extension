@@ -17,6 +17,10 @@ class SqlExecutorMock:
     def __init__(self):
         self.connection: Optional[sqlite3.Connection] = None
         self.cursor: Optional[sqlite3.Cursor] = None
+        
+        # Query cancellation support (for consistency with real executor)
+        self.is_cancelled: bool = False
+        self.current_result_set_id: Optional[str] = None
 
     def connect(self) -> Dict[str, Any]:
         """Establish SQLite in-memory connection and populate sample data"""
@@ -182,6 +186,10 @@ class SqlExecutorMock:
             }
 
         start_time = time.time()
+        
+        # Track current query and reset cancellation flag
+        self.current_result_set_id = result_set_id
+        self.is_cancelled = False
 
         try:
             # Check for slow query simulation trigger
@@ -189,6 +197,19 @@ class SqlExecutorMock:
             if "SLOW_QUERY" in sql.upper():
                 # Simulate a slow query with 5 second delay
                 time.sleep(10)
+            
+            # Check if query was cancelled during sleep
+            if self.is_cancelled:
+                execution_time_ms = int((time.time() - start_time) * 1000)
+                self.current_result_set_id = None
+                return {
+                    "success": False,
+                    "resultSetId": result_set_id,
+                    "error": "Query was cancelled",
+                    "errorType": "Cancelled",
+                    "executionTimeMs": execution_time_ms,
+                    "cancelled": True
+                }
             
             # Execute the SQL
             self.cursor.execute(sql)
@@ -204,6 +225,9 @@ class SqlExecutorMock:
 
                 # Get affected rows
                 row_count = self.cursor.rowcount if self.cursor.rowcount != -1 else 0
+                
+                # Clear current result set tracking
+                self.current_result_set_id = None
 
                 return {
                     "success": True,
@@ -240,6 +264,9 @@ class SqlExecutorMock:
                 row_count += 1
 
             execution_time_ms = int((time.time() - start_time) * 1000)
+            
+            # Clear current result set tracking
+            self.current_result_set_id = None
 
             return {
                 "success": True,
@@ -253,6 +280,10 @@ class SqlExecutorMock:
 
         except Exception as e:
             execution_time_ms = int((time.time() - start_time) * 1000)
+            
+            # Clear current result set tracking
+            self.current_result_set_id = None
+            
             return {
                 "success": False,
                 "resultSetId": result_set_id,
@@ -312,6 +343,26 @@ class SqlExecutorMock:
                 "traceback": traceback.format_exc()
             }
 
+    def cancel_query(self) -> Dict[str, Any]:
+        """Cancel the currently executing query without closing the connection"""
+        try:
+            # Set cancellation flag (SQLite doesn't support true async cancellation)
+            self.is_cancelled = True
+            
+            print("[DEBUG] Query cancellation requested (mock mode)", file=sys.stderr)
+            
+            return {
+                "success": True,
+                "message": "Query cancellation requested",
+                "resultSetId": self.current_result_set_id
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "traceback": traceback.format_exc()
+            }
+    
     def close(self):
         """Close the connection"""
         if self.cursor:
@@ -377,6 +428,23 @@ def main():
                     result = executor.reconnect()
                     send_message({
                         "type": "RECONNECT_RESULT",
+                        "payload": result
+                    })
+
+                elif command_type == "CANCEL":
+                    if not executor:
+                        send_message({
+                            "type": "CANCEL_RESULT",
+                            "payload": {
+                                "success": False,
+                                "error": "No executor instance available"
+                            }
+                        })
+                        continue
+                    
+                    result = executor.cancel_query()
+                    send_message({
+                        "type": "CANCEL_RESULT",
                         "payload": result
                     })
 

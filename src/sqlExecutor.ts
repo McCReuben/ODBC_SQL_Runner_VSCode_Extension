@@ -8,6 +8,7 @@ import { SessionManager } from "./pythonRunner";
 import { WebviewManager } from "./webviewManager";
 import * as crypto from "crypto";
 import * as path from "path";
+import * as fs from "fs";
 
 export class SqlExecutor {
   private sessionManager: SessionManager;
@@ -518,6 +519,674 @@ export class SqlExecutor {
 
     // Multiple statements - show them all with separators
     return statements.map((s) => s.sql).join("\n;\n");
+  }
+
+  /**
+   * Execute a specific SQL statement at a given position (called from CodeLens)
+   */
+  async executeStatementAtPosition(
+    uri: vscode.Uri,
+    startOffset: number,
+    endOffset: number
+  ) {
+    // Find the document
+    const document = await vscode.workspace.openTextDocument(uri);
+    const text = document.getText();
+    const sql = text.substring(startOffset, endOffset).trim();
+
+    if (!sql) {
+      vscode.window.showWarningMessage("No SQL statement found at position");
+      return;
+    }
+
+    // Generate run ID early so we can use it in catch blocks
+    const runId = this.generateId();
+
+    try {
+      const fileUri = uri.toString();
+      const fileName = require("path").basename(document.fileName);
+
+      // Track this running query
+      this.runningQueries.set(runId, fileUri);
+      this.runningResultSets.set(runId, new Set());
+
+      // Get or create webview panel FIRST (before establishing connection)
+      const panel = this.webviewManager.getOrCreatePanel(fileUri, fileName);
+
+      // Get or create session for this file
+      let session;
+      try {
+        // Notify webview that connection is starting
+        this.webviewManager.sendConnectionStarted(fileUri);
+
+        session = await this.sessionManager.getOrCreateSession(fileUri);
+
+        // Notify webview that connection succeeded
+        this.webviewManager.sendConnectionSuccess(fileUri);
+      } catch (error: any) {
+        this.runningQueries.delete(runId);
+
+        // Notify webview of connection error
+        this.webviewManager.sendConnectionError(fileUri, error.message);
+
+        vscode.window.showErrorMessage(
+          `Failed to create database session: ${error.message}`
+        );
+        return;
+      }
+
+      // Show progress
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Executing SQL query...",
+          cancellable: true,
+        },
+        async (progress, token) => {
+          try {
+            if (token.isCancellationRequested) {
+              return;
+            }
+
+            // Send RUN_STARTED message
+            this.queryCounter++;
+            this.webviewManager.sendRunStarted(
+              fileUri,
+              runId,
+              sql,
+              `Query ${this.queryCounter}`
+            );
+
+            const resultSetId = `${runId}-rs-0`;
+
+            // Send RESULT_SET_PENDING
+            this.webviewManager.sendResultSetPending(
+              fileUri,
+              runId,
+              resultSetId,
+              `Result 1`,
+              0,
+              sql
+            );
+
+            // Track this result set as running
+            this.runningResultSets.get(runId)?.add(resultSetId);
+
+            try {
+              const result = await session.executeQuery(sql, resultSetId, () => {
+                this.webviewManager.sendResultSetStarted(
+                  fileUri,
+                  runId,
+                  resultSetId,
+                  `Result 1`,
+                  0,
+                  sql
+                );
+              });
+
+              if (!result.success) {
+                this.webviewManager.sendResultSetError(fileUri, runId, resultSetId, {
+                  message: result.error || "Unknown error",
+                  type: result.errorType,
+                  details: result.errorDetails,
+                  rawError: result.rawError,
+                  traceback: result.traceback,
+                });
+                this.runningResultSets.get(runId)?.delete(resultSetId);
+              } else if (result.hasResults && result.columns && result.rows) {
+                this.webviewManager.sendResultSetSchema(
+                  fileUri,
+                  runId,
+                  resultSetId,
+                  result.columns
+                );
+
+                this.webviewManager.sendResultSetRows(
+                  fileUri,
+                  runId,
+                  resultSetId,
+                  result.rows,
+                  false
+                );
+
+                this.webviewManager.sendResultSetComplete(
+                  fileUri,
+                  runId,
+                  resultSetId,
+                  result.rowCount || 0,
+                  result.executionTimeMs || 0
+                );
+                this.runningResultSets.get(runId)?.delete(resultSetId);
+              } else {
+                this.webviewManager.sendResultSetSchema(
+                  fileUri,
+                  runId,
+                  resultSetId,
+                  [{ name: "Message", type: "string" }]
+                );
+
+                this.webviewManager.sendResultSetRows(
+                  fileUri,
+                  runId,
+                  resultSetId,
+                  [{ Message: result.message || "Query executed successfully" }],
+                  false
+                );
+
+                this.webviewManager.sendResultSetComplete(
+                  fileUri,
+                  runId,
+                  resultSetId,
+                  result.rowCount || 0,
+                  result.executionTimeMs || 0
+                );
+                this.runningResultSets.get(runId)?.delete(resultSetId);
+              }
+            } catch (error: any) {
+              this.webviewManager.sendResultSetError(fileUri, runId, resultSetId, {
+                message: error.message || "Unknown error",
+                type: "Execution Error",
+                rawError: error.stack || error.toString(),
+              });
+              this.runningResultSets.get(runId)?.delete(resultSetId);
+            }
+
+            // Send RUN_COMPLETE
+            this.webviewManager.sendRunComplete(fileUri, runId);
+            vscode.window.showInformationMessage("Executed 1 statement");
+          } catch (error: any) {
+            this.webviewManager.sendRunError(
+              fileUri,
+              runId,
+              error.message || "Unknown error"
+            );
+            vscode.window.showErrorMessage(
+              `Query execution failed: ${error.message}`
+            );
+          } finally {
+            this.runningQueries.delete(runId);
+            this.runningResultSets.delete(runId);
+          }
+        }
+      );
+    } catch (error: any) {
+      this.runningQueries.delete(runId);
+      this.runningResultSets.delete(runId);
+      vscode.window.showErrorMessage(`Unexpected error: ${error.message}`);
+      console.error("SQL execution error:", error);
+    }
+  }
+
+  /**
+   * Run a DESCRIBE TABLE statement for the given table name
+   */
+  async describeTable(uri: vscode.Uri, tableName: string) {
+    // Generate the DESCRIBE statement
+    const sql = `DESCRIBE ${tableName}`;
+
+    // Generate run ID early so we can use it in catch blocks
+    const runId = this.generateId();
+
+    try {
+      const document = await vscode.workspace.openTextDocument(uri);
+      const fileUri = uri.toString();
+      const fileName = require("path").basename(document.fileName);
+
+      // Track this running query
+      this.runningQueries.set(runId, fileUri);
+      this.runningResultSets.set(runId, new Set());
+
+      // Get or create webview panel FIRST (before establishing connection)
+      const panel = this.webviewManager.getOrCreatePanel(fileUri, fileName);
+
+      // Get or create session for this file
+      let session;
+      try {
+        // Notify webview that connection is starting
+        this.webviewManager.sendConnectionStarted(fileUri);
+
+        session = await this.sessionManager.getOrCreateSession(fileUri);
+
+        // Notify webview that connection succeeded
+        this.webviewManager.sendConnectionSuccess(fileUri);
+      } catch (error: any) {
+        this.runningQueries.delete(runId);
+
+        // Notify webview of connection error
+        this.webviewManager.sendConnectionError(fileUri, error.message);
+
+        vscode.window.showErrorMessage(
+          `Failed to create database session: ${error.message}`
+        );
+        return;
+      }
+
+      // Show progress
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: `Describing table ${tableName}...`,
+          cancellable: true,
+        },
+        async (progress, token) => {
+          try {
+            if (token.isCancellationRequested) {
+              return;
+            }
+
+            // Send RUN_STARTED message
+            this.queryCounter++;
+            this.webviewManager.sendRunStarted(
+              fileUri,
+              runId,
+              sql,
+              `Describe: ${tableName}`
+            );
+
+            const resultSetId = `${runId}-rs-0`;
+
+            // Send RESULT_SET_PENDING
+            this.webviewManager.sendResultSetPending(
+              fileUri,
+              runId,
+              resultSetId,
+              `${tableName} Schema`,
+              0,
+              sql
+            );
+
+            // Track this result set as running
+            this.runningResultSets.get(runId)?.add(resultSetId);
+
+            try {
+              const result = await session.executeQuery(sql, resultSetId, () => {
+                this.webviewManager.sendResultSetStarted(
+                  fileUri,
+                  runId,
+                  resultSetId,
+                  `${tableName} Schema`,
+                  0,
+                  sql
+                );
+              });
+
+              if (!result.success) {
+                this.webviewManager.sendResultSetError(fileUri, runId, resultSetId, {
+                  message: result.error || "Unknown error",
+                  type: result.errorType,
+                  details: result.errorDetails,
+                  rawError: result.rawError,
+                  traceback: result.traceback,
+                });
+                this.runningResultSets.get(runId)?.delete(resultSetId);
+              } else if (result.hasResults && result.columns && result.rows) {
+                this.webviewManager.sendResultSetSchema(
+                  fileUri,
+                  runId,
+                  resultSetId,
+                  result.columns
+                );
+
+                this.webviewManager.sendResultSetRows(
+                  fileUri,
+                  runId,
+                  resultSetId,
+                  result.rows,
+                  false
+                );
+
+                this.webviewManager.sendResultSetComplete(
+                  fileUri,
+                  runId,
+                  resultSetId,
+                  result.rowCount || 0,
+                  result.executionTimeMs || 0
+                );
+                this.runningResultSets.get(runId)?.delete(resultSetId);
+              } else {
+                this.webviewManager.sendResultSetSchema(
+                  fileUri,
+                  runId,
+                  resultSetId,
+                  [{ name: "Message", type: "string" }]
+                );
+
+                this.webviewManager.sendResultSetRows(
+                  fileUri,
+                  runId,
+                  resultSetId,
+                  [{ Message: result.message || "No schema information available" }],
+                  false
+                );
+
+                this.webviewManager.sendResultSetComplete(
+                  fileUri,
+                  runId,
+                  resultSetId,
+                  result.rowCount || 0,
+                  result.executionTimeMs || 0
+                );
+                this.runningResultSets.get(runId)?.delete(resultSetId);
+              }
+            } catch (error: any) {
+              this.webviewManager.sendResultSetError(fileUri, runId, resultSetId, {
+                message: error.message || "Unknown error",
+                type: "Execution Error",
+                rawError: error.stack || error.toString(),
+              });
+              this.runningResultSets.get(runId)?.delete(resultSetId);
+            }
+
+            // Send RUN_COMPLETE
+            this.webviewManager.sendRunComplete(fileUri, runId);
+            vscode.window.showInformationMessage(
+              `Described table: ${tableName}`
+            );
+          } catch (error: any) {
+            this.webviewManager.sendRunError(
+              fileUri,
+              runId,
+              error.message || "Unknown error"
+            );
+            vscode.window.showErrorMessage(
+              `Failed to describe table: ${error.message}`
+            );
+          } finally {
+            this.runningQueries.delete(runId);
+            this.runningResultSets.delete(runId);
+          }
+        }
+      );
+    } catch (error: any) {
+      this.runningQueries.delete(runId);
+      this.runningResultSets.delete(runId);
+      vscode.window.showErrorMessage(`Unexpected error: ${error.message}`);
+      console.error("Describe table error:", error);
+    }
+  }
+
+  /**
+   * Export query result to CSV file
+   */
+  async exportQueryResult(
+    uri: vscode.Uri,
+    startOffset: number,
+    endOffset: number
+  ) {
+    // Find the document
+    const document = await vscode.workspace.openTextDocument(uri);
+    const text = document.getText();
+    const sql = text.substring(startOffset, endOffset).trim();
+
+    if (!sql) {
+      vscode.window.showWarningMessage("No SQL statement found at position");
+      return;
+    }
+
+    // Generate run ID early so we can use it in catch blocks
+    const runId = this.generateId();
+
+    try {
+      const fileUri = uri.toString();
+      const fileName = path.basename(document.fileName);
+      const fileDir = path.dirname(document.fileName);
+
+      // Get export directory from settings
+      const config = vscode.workspace.getConfiguration("sqlRunner");
+      let exportDir = config.get<string>("exportDirectory") || "";
+      
+      // If no export directory configured, use the SQL file's directory
+      if (!exportDir) {
+        exportDir = fileDir;
+      }
+
+      // Ensure export directory exists
+      if (!fs.existsSync(exportDir)) {
+        try {
+          fs.mkdirSync(exportDir, { recursive: true });
+        } catch (mkdirError: any) {
+          vscode.window.showErrorMessage(
+            `Failed to create export directory: ${mkdirError.message}`
+          );
+          return;
+        }
+      }
+
+      // Generate export filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      const baseName = path.basename(document.fileName, ".sql");
+      const exportFileName = `${baseName}_export_${timestamp}.csv`;
+      const exportPath = path.join(exportDir, exportFileName);
+
+      // Track this running query
+      this.runningQueries.set(runId, fileUri);
+      this.runningResultSets.set(runId, new Set());
+
+      // Get or create webview panel FIRST (before establishing connection)
+      const panel = this.webviewManager.getOrCreatePanel(fileUri, fileName);
+
+      // Get or create session for this file
+      let session;
+      try {
+        // Notify webview that connection is starting
+        this.webviewManager.sendConnectionStarted(fileUri);
+
+        session = await this.sessionManager.getOrCreateSession(fileUri);
+
+        // Notify webview that connection succeeded
+        this.webviewManager.sendConnectionSuccess(fileUri);
+      } catch (error: any) {
+        this.runningQueries.delete(runId);
+
+        // Notify webview of connection error
+        this.webviewManager.sendConnectionError(fileUri, error.message);
+
+        vscode.window.showErrorMessage(
+          `Failed to create database session: ${error.message}`
+        );
+        return;
+      }
+
+      // Show progress
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Executing and exporting SQL query...",
+          cancellable: true,
+        },
+        async (progress, token) => {
+          try {
+            if (token.isCancellationRequested) {
+              return;
+            }
+
+            // Send RUN_STARTED message
+            this.queryCounter++;
+            this.webviewManager.sendRunStarted(
+              fileUri,
+              runId,
+              sql,
+              `Export ${this.queryCounter}`
+            );
+
+            const resultSetId = `${runId}-rs-0`;
+
+            // Send RESULT_SET_PENDING
+            this.webviewManager.sendResultSetPending(
+              fileUri,
+              runId,
+              resultSetId,
+              `Result 1`,
+              0,
+              sql
+            );
+
+            // Track this result set as running
+            this.runningResultSets.get(runId)?.add(resultSetId);
+
+            try {
+              const result = await session.executeQuery(sql, resultSetId, () => {
+                this.webviewManager.sendResultSetStarted(
+                  fileUri,
+                  runId,
+                  resultSetId,
+                  `Result 1`,
+                  0,
+                  sql
+                );
+              });
+
+              if (!result.success) {
+                this.webviewManager.sendResultSetError(fileUri, runId, resultSetId, {
+                  message: result.error || "Unknown error",
+                  type: result.errorType,
+                  details: result.errorDetails,
+                  rawError: result.rawError,
+                  traceback: result.traceback,
+                });
+                this.runningResultSets.get(runId)?.delete(resultSetId);
+              } else if (result.hasResults && result.columns && result.rows) {
+                // Export to CSV
+                const csvContent = this.convertToCSV(result.columns, result.rows);
+                fs.writeFileSync(exportPath, csvContent, "utf-8");
+
+                // Send results to webview
+                this.webviewManager.sendResultSetSchema(
+                  fileUri,
+                  runId,
+                  resultSetId,
+                  result.columns
+                );
+
+                this.webviewManager.sendResultSetRows(
+                  fileUri,
+                  runId,
+                  resultSetId,
+                  result.rows,
+                  false
+                );
+
+                this.webviewManager.sendResultSetComplete(
+                  fileUri,
+                  runId,
+                  resultSetId,
+                  result.rowCount || 0,
+                  result.executionTimeMs || 0
+                );
+                this.runningResultSets.get(runId)?.delete(resultSetId);
+
+                // Show success message with export info
+                vscode.window
+                  .showInformationMessage(
+                    `Exported ${result.rowCount || 0} rows to ${exportFileName}`,
+                    "Open File",
+                    "Open Folder"
+                  )
+                  .then((selection) => {
+                    if (selection === "Open File") {
+                      vscode.commands.executeCommand(
+                        "vscode.open",
+                        vscode.Uri.file(exportPath)
+                      );
+                    } else if (selection === "Open Folder") {
+                      vscode.commands.executeCommand(
+                        "revealFileInOS",
+                        vscode.Uri.file(exportPath)
+                      );
+                    }
+                  });
+              } else {
+                // DDL/DML query with no results - nothing to export
+                this.webviewManager.sendResultSetSchema(
+                  fileUri,
+                  runId,
+                  resultSetId,
+                  [{ name: "Message", type: "string" }]
+                );
+
+                this.webviewManager.sendResultSetRows(
+                  fileUri,
+                  runId,
+                  resultSetId,
+                  [{ Message: "Query executed but returned no data to export" }],
+                  false
+                );
+
+                this.webviewManager.sendResultSetComplete(
+                  fileUri,
+                  runId,
+                  resultSetId,
+                  0,
+                  result.executionTimeMs || 0
+                );
+                this.runningResultSets.get(runId)?.delete(resultSetId);
+
+                vscode.window.showWarningMessage(
+                  "Query executed but returned no data to export"
+                );
+              }
+            } catch (error: any) {
+              this.webviewManager.sendResultSetError(fileUri, runId, resultSetId, {
+                message: error.message || "Unknown error",
+                type: "Execution Error",
+                rawError: error.stack || error.toString(),
+              });
+              this.runningResultSets.get(runId)?.delete(resultSetId);
+            }
+
+            // Send RUN_COMPLETE
+            this.webviewManager.sendRunComplete(fileUri, runId);
+          } catch (error: any) {
+            this.webviewManager.sendRunError(
+              fileUri,
+              runId,
+              error.message || "Unknown error"
+            );
+            vscode.window.showErrorMessage(
+              `Export failed: ${error.message}`
+            );
+          } finally {
+            this.runningQueries.delete(runId);
+            this.runningResultSets.delete(runId);
+          }
+        }
+      );
+    } catch (error: any) {
+      this.runningQueries.delete(runId);
+      this.runningResultSets.delete(runId);
+      vscode.window.showErrorMessage(`Unexpected error: ${error.message}`);
+      console.error("Export query error:", error);
+    }
+  }
+
+  /**
+   * Convert query results to CSV format
+   */
+  private convertToCSV(
+    columns: Array<{ name: string; type: string }>,
+    rows: Array<Record<string, any>>
+  ): string {
+    const escapeCSV = (value: any): string => {
+      if (value === null || value === undefined) {
+        return "";
+      }
+      const str = String(value);
+      // Escape quotes and wrap in quotes if contains comma, quote, or newline
+      if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    // Header row
+    const header = columns.map((col) => escapeCSV(col.name)).join(",");
+
+    // Data rows
+    const dataRows = rows.map((row) =>
+      columns.map((col) => escapeCSV(row[col.name])).join(",")
+    );
+
+    return [header, ...dataRows].join("\n");
   }
 
   /**

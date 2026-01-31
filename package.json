@@ -18,6 +18,18 @@
       {
         "command": "sqlRunner.executeQuery",
         "title": "Execute SQL Query"
+      },
+      {
+        "command": "sqlRunner.executeStatementAtLine",
+        "title": "Execute SQL Statement at Position"
+      },
+      {
+        "command": "sqlRunner.describeTable",
+        "title": "Describe Table"
+      },
+      {
+        "command": "sqlRunner.exportResult",
+        "title": "Export Query Result to CSV"
       }
     ],
     "keybindings": [
@@ -47,6 +59,11 @@
           "type": "boolean",
           "default": false,
           "description": "Use in-memory SQLite mock database instead of ODBC (useful for testing without ODBC setup)"
+        },
+        "sqlRunner.exportDirectory": {
+          "type": "string",
+          "default": "",
+          "description": "Directory to export query results to CSV. If empty, exports to the same directory as the SQL file."
         }
       }
     }

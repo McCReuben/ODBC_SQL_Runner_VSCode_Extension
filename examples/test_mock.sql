@@ -11,8 +11,20 @@
 -- - active_sites (view)
 -- ============================================
 
+/*
+
+*/
+
+
 -- Example 1: Query the people table
 SELECT * FROM people WHERE age > 28;
+
+SELECT * FROM people WHERE age > 28;
+
+
+/*
+SELECT * FROM people WHERE age > 28;
+*/
 
 -- SLOW_QUERY
 SELECT * FROM people WHERE age > 28;
@@ -33,6 +45,9 @@ SELECT p.name, p.category, s.quantity, s.revenue, s.sale_date
 FROM sales s
     JOIN products p ON s.product_id = p.id
 ORDER BY s.sale_date DESC;
+
+
+
 
 -- Example 4: Create a temporary table (session persistence test)
 CREATE TEMPORARY TABLE tmp_high_earners AS

@@ -8,10 +8,7 @@ import { registerSqlCodeLens } from "./sqlCodeLens";
 import { SchemaMetadataStore } from "./schemaMetadata";
 import { MetadataWorker } from "./metadataWorker";
 import { registerSqlCompletionProvider } from "./sqlCompletionProvider";
-import {
-  registerSqlDefinitionProvider,
-  getTableNameAtCursor,
-} from "./sqlDefinitionProvider";
+import { getTableNameAtCursor } from "./sqlDefinitionProvider";
 
 let sqlExecutor: SqlExecutor;
 let metadataStore: SchemaMetadataStore;
@@ -34,10 +31,6 @@ export function activate(context: vscode.ExtensionContext) {
   // Register CodeLens provider for SQL files
   const codeLensDisposable = registerSqlCodeLens(context);
   context.subscriptions.push(codeLensDisposable);
-
-  // Register Definition Provider for Option+Click / Cmd+Click on table names
-  const definitionProviderDisposable = registerSqlDefinitionProvider(context);
-  context.subscriptions.push(definitionProviderDisposable);
 
   // Register Intellisense completion provider (if enabled)
   const config = vscode.workspace.getConfiguration("sqlRunner.intellisense");
@@ -92,7 +85,7 @@ export function activate(context: vscode.ExtensionContext) {
       const tableName = getTableNameAtCursor();
       if (!tableName) {
         vscode.window.showWarningMessage(
-          "No table name found at cursor position"
+          "No table name found at cursor position",
         );
         return;
       }

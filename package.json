@@ -68,6 +68,14 @@
         "win": "ctrl+enter",
         "linux": "ctrl+enter",
         "when": "editorTextFocus && editorLangId == sql"
+      },
+      {
+        "command": "sqlRunner.describeTableAtCursor",
+        "key": "cmd+d",
+        "mac": "cmd+d",
+        "win": "ctrl+d",
+        "linux": "ctrl+d",
+        "when": "editorTextFocus && editorLangId == sql"
       }
     ],
     "configuration": {

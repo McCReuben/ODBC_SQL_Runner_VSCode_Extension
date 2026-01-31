@@ -186,6 +186,37 @@ body {
   background: var(--scrollbar-thumb-hover);
 }
 
+/* Header popup button styling - ensure it displays inline to the left */
+.tabulator .tabulator-header .tabulator-col .tabulator-header-popup-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  padding: 0 4px;
+  margin: 0;
+  height: auto;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.tabulator .tabulator-header .tabulator-col .tabulator-header-popup-button:hover {
+  opacity: 1;
+}
+
+.tabulator .tabulator-header .tabulator-col .tabulator-col-content {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tabulator .tabulator-header .tabulator-col .tabulator-col-title {
+  flex: 1;
+  display: inline-block;
+}
+
 /* ============================================================================
    Custom utility classes
    ============================================================================ */

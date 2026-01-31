@@ -87,6 +87,43 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(
       };
     }, []);
 
+    // Create header popup filter formatter
+    const createHeaderFilterPopup = useCallback((_column: any) => {
+      return function(_e: MouseEvent, columnComponent: any, onRendered: (callback: () => void) => void) {
+        const container = document.createElement("div");
+        container.style.cssText = "padding: 8px; min-width: 200px;";
+        
+        const label = document.createElement("label");
+        label.innerHTML = "Filter Column:";
+        label.style.cssText = "display: block; font-size: 0.85em; margin-bottom: 6px; font-weight: 500;";
+        
+        const input = document.createElement("input");
+        input.type = "text";
+        input.placeholder = `Filter ${columnComponent.getDefinition().title}...`;
+        input.value = columnComponent.getHeaderFilterValue() || "";
+        input.style.cssText = "width: 100%; padding: 6px; border: 1px solid var(--vscode-input-border, #333); background: var(--vscode-input-background, #1e1e1e); color: var(--vscode-input-foreground, #ccc); border-radius: 3px; font-size: 0.9em;";
+        
+        input.addEventListener("keyup", () => {
+          columnComponent.setHeaderFilterValue(input.value);
+        });
+        
+        // Focus the input after it's rendered
+        onRendered(() => {
+          input.focus();
+        });
+        
+        container.appendChild(label);
+        container.appendChild(input);
+        
+        return container;
+      };
+    }, []);
+
+    // Create empty header filter element (required for filtering to work)
+    const createEmptyHeaderFilter = useCallback(() => {
+      return document.createElement("div");
+    }, []);
+
     // Initialize or update Tabulator
     useEffect(() => {
       if (!containerRef.current) return;
@@ -125,6 +162,12 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(
           // Format cells based on type hint
           formatter: col.type === 'number' ? 'money' : undefined,
           formatterParams: col.type === 'number' ? { precision: false, thousand: ',' } : undefined,
+          // Add filter popup to header
+          headerPopup: createHeaderFilterPopup(col),
+          headerPopupIcon: '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="opacity: 0.7; display: inline-block; vertical-align: middle; margin-right: 4px;"><path d="M1.5 1.5A.5.5 0 0 1 2 1h12a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.128.334L10 8.692V13.5a.5.5 0 0 1-.342.474l-3 1A.5.5 0 0 1 6 14.5V8.692L1.628 3.834A.5.5 0 0 1 1.5 3.5v-2zm1 .5v1.308l4.372 4.858A.5.5 0 0 1 7 8.5v5.306l2-.666V8.5a.5.5 0 0 1 .128-.334L13.5 3.308V2h-11z"/></svg>',
+          // Add dummy header filter to enable filtering functionality
+          headerFilter: createEmptyHeaderFilter,
+          headerFilterFunc: col.type === 'number' ? '=' : 'like',
         }));
 
         tableRef.current = new Tabulator(containerRef.current, {
@@ -176,7 +219,7 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(
       return () => {
         // Cleanup on unmount
       };
-    }, [resultSet, computeSelectionStats, onSelectionChange]);
+    }, [resultSet, computeSelectionStats, onSelectionChange, createHeaderFilterPopup, createEmptyHeaderFilter]);
 
     // Handle Cmd+Shift+C / Ctrl+Shift+C to copy entire table to clipboard
     useEffect(() => {

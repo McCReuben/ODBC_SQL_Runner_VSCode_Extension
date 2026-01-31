@@ -252,9 +252,16 @@ class SqlExecutor:
                 "message": f"Connected to {self.dsn} (schema: ACCESS_VIEWS)"
             }
         except Exception as e:
+            error_str = str(e)
+            
+            # Check for "SSL_write: Broken pipe" error - SSH tunnel issue
+            ssh_tunnel_hint = ""
+            if "SSL_write: Broken pipe" in error_str or "Broken pipe" in error_str:
+                ssh_tunnel_hint = "\n\n💡 Connection failed: Ensure your SSH tunnel is up, your DSN is set up correctly in VSCode settings, and try again."
+            
             return {
                 "success": False,
-                "error": str(e),
+                "error": error_str + ssh_tunnel_hint,
                 "traceback": traceback.format_exc()
             }
 
@@ -297,7 +304,21 @@ class SqlExecutor:
                             self.last_activity_time = time.time()
                             print(f"[DEBUG] Heartbeat sent (idle for {time_since_last_activity:.1f}s)", file=sys.stderr)
                 except Exception as e:
-                    print(f"[DEBUG] Heartbeat failed: {str(e)}", file=sys.stderr)
+                    error_str = str(e)
+                    print(f"[DEBUG] Heartbeat failed: {error_str}", file=sys.stderr)
+                    
+                    # Check if this is the "No more data to read" error
+                    if "No more data to read" in error_str:
+                        print("[DEBUG] Detected 'No more data to read' error in heartbeat, attempting reconnection...", file=sys.stderr)
+                        try:
+                            # Attempt to reconnect
+                            reconnect_result = self.reconnect()
+                            if reconnect_result.get("success"):
+                                print("[DEBUG] Heartbeat reconnection successful", file=sys.stderr)
+                            else:
+                                print(f"[DEBUG] Heartbeat reconnection failed: {reconnect_result.get('error')}", file=sys.stderr)
+                        except Exception as reconnect_error:
+                            print(f"[DEBUG] Heartbeat reconnection exception: {str(reconnect_error)}", file=sys.stderr)
                     # Don't break - keep trying
 
     def execute_query(self, sql: str, result_set_id: str, max_rows: int = 0) -> Dict[str, Any]:
@@ -314,6 +335,11 @@ class SqlExecutor:
                 "error": "Not connected to database"
             }
 
+        # Try executing the query, with automatic reconnection on connection errors
+        return self._execute_query_with_retry(sql, result_set_id, max_rows)
+    
+    def _execute_query_with_retry(self, sql: str, result_set_id: str, max_rows: int = 0, retry_count: int = 0) -> Dict[str, Any]:
+        """Internal method to execute query with automatic reconnection on connection errors"""
         start_time = time.time()
         
         # Track current query and reset cancellation flag
@@ -415,8 +441,30 @@ class SqlExecutor:
             error_str = str(e)
             full_traceback = traceback.format_exc()
             
+            # Check for "No more data to read" error - this means we need to reconnect
+            if "No more data to read" in error_str and retry_count == 0:
+                print(f"[DEBUG] Detected 'No more data to read' error, attempting automatic reconnection...", file=sys.stderr)
+                reconnect_result = self.reconnect()
+                
+                if reconnect_result.get("success"):
+                    print(f"[DEBUG] Reconnection successful, retrying query...", file=sys.stderr)
+                    # Retry the query once after successful reconnection
+                    return self._execute_query_with_retry(sql, result_set_id, max_rows, retry_count=1)
+                else:
+                    print(f"[DEBUG] Reconnection failed: {reconnect_result.get('error')}", file=sys.stderr)
+                    # Fall through to return the error
+            
+            # Check for "SSL_write: Broken pipe" error - SSH tunnel issue
+            ssh_tunnel_hint = ""
+            if "SSL_write: Broken pipe" in error_str or "Broken pipe" in error_str:
+                ssh_tunnel_hint = "\n\n💡 Connection lost: Ensure your SSH tunnel is up, your DSN is set up correctly in VSCode settings, and try again."
+            
             # Use our error parser to get a clean message
             clean_message, error_type, error_details = SparkErrorParser.parse_error(error_str)
+            
+            # Append SSH tunnel hint if applicable
+            if ssh_tunnel_hint:
+                clean_message += ssh_tunnel_hint
             
             return {
                 "success": False,
@@ -472,9 +520,16 @@ class SqlExecutor:
                 "message": f"Reconnected to {self.dsn} (schema: ACCESS_VIEWS)"
             }
         except Exception as e:
+            error_str = str(e)
+            
+            # Check for "SSL_write: Broken pipe" error - SSH tunnel issue
+            ssh_tunnel_hint = ""
+            if "SSL_write: Broken pipe" in error_str or "Broken pipe" in error_str:
+                ssh_tunnel_hint = "\n\n💡 Connection failed: Ensure your SSH tunnel is up, your DSN is set up correctly in VSCode settings, and try again."
+            
             return {
                 "success": False,
-                "error": str(e),
+                "error": error_str + ssh_tunnel_hint,
                 "traceback": traceback.format_exc()
             }
 

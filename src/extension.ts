@@ -5,18 +5,44 @@
 import * as vscode from "vscode";
 import { SqlExecutor } from "./sqlExecutor";
 import { registerSqlCodeLens } from "./sqlCodeLens";
+import { SchemaMetadataStore } from "./schemaMetadata";
+import { MetadataWorker } from "./metadataWorker";
+import { registerSqlCompletionProvider } from "./sqlCompletionProvider";
 
 let sqlExecutor: SqlExecutor;
+let metadataStore: SchemaMetadataStore;
+let metadataWorker: MetadataWorker;
 
 export function activate(context: vscode.ExtensionContext) {
   console.log("SQL Runner extension is now active");
 
-  // Initialize SQL executor
-  sqlExecutor = new SqlExecutor(context);
+  // Initialize schema metadata store
+  metadataStore = new SchemaMetadataStore(context);
+  context.subscriptions.push(metadataStore);
+
+  // Initialize metadata worker
+  metadataWorker = new MetadataWorker(context, metadataStore);
+  context.subscriptions.push(metadataWorker);
+
+  // Initialize SQL executor with metadata store reference
+  sqlExecutor = new SqlExecutor(context, metadataStore);
 
   // Register CodeLens provider for SQL files
   const codeLensDisposable = registerSqlCodeLens(context);
   context.subscriptions.push(codeLensDisposable);
+
+  // Register Intellisense completion provider (if enabled)
+  const config = vscode.workspace.getConfiguration("sqlRunner.intellisense");
+  if (config.get<boolean>("enabled", true)) {
+    const completionDisposable = registerSqlCompletionProvider(context, metadataStore);
+    context.subscriptions.push(completionDisposable);
+    console.log("SQL Intellisense enabled");
+
+    // Start metadata worker in the background
+    metadataWorker.start().catch((error) => {
+      console.error("Failed to start metadata worker:", error);
+    });
+  }
 
   // Register command: Execute query (Cmd+Enter or from CodeLens)
   const executeCommand = vscode.commands.registerCommand(
@@ -78,18 +104,55 @@ export function activate(context: vscode.ExtensionContext) {
     },
   );
 
+  // Register command: Refresh schema metadata
+  const refreshMetadataCommand = vscode.commands.registerCommand(
+    "sqlRunner.refreshMetadata",
+    async () => {
+      if (metadataWorker) {
+        vscode.window.showInformationMessage("Refreshing schema metadata...");
+        metadataWorker.scheduleRefreshCycle();
+      }
+    }
+  );
+
+  // Register command: Show metadata statistics
+  const showMetadataStatsCommand = vscode.commands.registerCommand(
+    "sqlRunner.showMetadataStats",
+    async () => {
+      if (metadataStore) {
+        const stats = metadataStore.getStats();
+        const workerState = metadataWorker?.getState() || "unknown";
+        const queueLength = metadataWorker?.getQueueLength() || 0;
+
+        vscode.window.showInformationMessage(
+          `Metadata Stats: ${stats.totalSchemas} schemas, ${stats.totalTables} tables (${stats.tablesWithColumns} with columns). ` +
+          `Auto-discovered: ${stats.autoDiscoveredSchemas} schemas, ${stats.autoDiscoveredTables} tables. ` +
+          `Worker: ${workerState}, Queue: ${queueLength}`
+        );
+      }
+    }
+  );
+
   context.subscriptions.push(executeCommand);
   context.subscriptions.push(executeStatementAtLineCommand);
   context.subscriptions.push(describeTableCommand);
   context.subscriptions.push(exportResultCommand);
   context.subscriptions.push(selectStatementCommand);
   context.subscriptions.push(copyStatementCommand);
+  context.subscriptions.push(refreshMetadataCommand);
+  context.subscriptions.push(showMetadataStatsCommand);
 
   // Cleanup on deactivation
   context.subscriptions.push({
     dispose: () => {
       if (sqlExecutor) {
         sqlExecutor.dispose();
+      }
+      if (metadataWorker) {
+        metadataWorker.dispose();
+      }
+      if (metadataStore) {
+        metadataStore.dispose();
       }
     },
   });
@@ -98,5 +161,11 @@ export function activate(context: vscode.ExtensionContext) {
 export function deactivate() {
   if (sqlExecutor) {
     sqlExecutor.dispose();
+  }
+  if (metadataWorker) {
+    metadataWorker.dispose();
+  }
+  if (metadataStore) {
+    metadataStore.dispose();
   }
 }

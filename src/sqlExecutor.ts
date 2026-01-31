@@ -6,6 +6,7 @@ import * as vscode from "vscode";
 import { getSqlToExecute, StatementInfo } from "./statementParser";
 import { SessionManager } from "./pythonRunner";
 import { WebviewManager } from "./webviewManager";
+import { SchemaMetadataStore } from "./schemaMetadata";
 import * as crypto from "crypto";
 import * as path from "path";
 import * as fs from "fs";
@@ -13,13 +14,20 @@ import * as fs from "fs";
 export class SqlExecutor {
   private sessionManager: SessionManager;
   private webviewManager: WebviewManager;
+  private metadataStore: SchemaMetadataStore | null;
   private runningQueries: Map<string, string> = new Map(); // runId -> fileUri
   private runningResultSets: Map<string, Set<string>> = new Map(); // runId -> Set<resultSetId>
   private queryCounter: number = 0; // Incremental counter for query numbers
+  private defaultSchema: string = "ACCESS_VIEWS";
 
-  constructor(context: vscode.ExtensionContext) {
+  constructor(context: vscode.ExtensionContext, metadataStore?: SchemaMetadataStore) {
     this.sessionManager = new SessionManager(context);
     this.webviewManager = new WebviewManager(context);
+    this.metadataStore = metadataStore || null;
+    
+    // Load default schema from config
+    const config = vscode.workspace.getConfiguration("sqlRunner.intellisense");
+    this.defaultSchema = config.get<string>("defaultSchema", "ACCESS_VIEWS");
 
     // Set up message handler for webview messages
     this.webviewManager.setMessageHandler((message) => {
@@ -96,6 +104,9 @@ export class SqlExecutor {
         vscode.window.showWarningMessage("No SQL statements to execute");
         return;
       }
+
+      // Extract and register table references for Intellisense
+      this.extractAndRegisterTableReferences(statements);
 
       // Track this running query
       this.runningQueries.set(runId, fileUri);
@@ -527,6 +538,82 @@ export class SqlExecutor {
   }
 
   /**
+   * Extract table references from SQL statements and add them to metadata store
+   * This auto-expands the allow-list based on usage
+   */
+  private extractAndRegisterTableReferences(statements: StatementInfo[]): void {
+    // Check if auto-expand is enabled
+    const config = vscode.workspace.getConfiguration("sqlRunner.intellisense");
+    if (!config.get<boolean>("autoExpandFromQueries", true)) {
+      return;
+    }
+
+    if (!this.metadataStore) {
+      return;
+    }
+
+    const schemas: Set<string> = new Set();
+    const tables: { schema: string; table: string }[] = [];
+
+    for (const stmt of statements) {
+      const sql = stmt.sql;
+
+      // Pattern to match table references in various SQL contexts
+      // Handles: FROM table, JOIN table, INTO table, UPDATE table, TABLE table
+      // Also handles schema.table format
+      const tablePatterns = [
+        // FROM/JOIN clauses
+        /(?:from|join)\s+([\w.]+)/gi,
+        // INSERT INTO
+        /insert\s+(?:into\s+)?([\w.]+)/gi,
+        // UPDATE
+        /update\s+([\w.]+)/gi,
+        // CREATE/DROP/ALTER TABLE
+        /(?:create|drop|alter)\s+(?:or\s+replace\s+)?(?:temporary\s+)?(?:external\s+)?table\s+(?:if\s+(?:not\s+)?exists\s+)?([\w.]+)/gi,
+        // DESCRIBE
+        /describe\s+([\w.]+)/gi,
+        // SHOW TABLES IN
+        /show\s+tables\s+in\s+(\w+)/gi,
+        // USE schema
+        /use\s+(\w+)/gi,
+      ];
+
+      for (const pattern of tablePatterns) {
+        let match;
+        while ((match = pattern.exec(sql)) !== null) {
+          const fullName = match[1];
+
+          if (fullName.includes(".")) {
+            // Schema-qualified table
+            const [schemaName, tableName] = fullName.split(".");
+            schemas.add(schemaName);
+            tables.push({ schema: schemaName, table: tableName });
+          } else {
+            // Unqualified - could be a table or schema
+            // Check if it looks like a USE statement (just schema)
+            if (/use\s+/i.test(match[0])) {
+              schemas.add(fullName);
+            } else if (/show\s+tables\s+in\s+/i.test(match[0])) {
+              schemas.add(fullName);
+            } else {
+              // Assume it's a table in the default schema
+              tables.push({ schema: this.defaultSchema, table: fullName });
+            }
+          }
+        }
+      }
+    }
+
+    // Add discovered schemas and tables to metadata store
+    if (schemas.size > 0 || tables.length > 0) {
+      this.metadataStore.addFromQuery(Array.from(schemas), tables);
+      console.log(
+        `[SqlExecutor] Auto-discovered ${schemas.size} schemas and ${tables.length} tables from query`
+      );
+    }
+  }
+
+  /**
    * Execute a specific SQL statement at a given position (called from CodeLens)
    */
   async executeStatementAtPosition(
@@ -543,6 +630,9 @@ export class SqlExecutor {
       vscode.window.showWarningMessage("No SQL statement found at position");
       return;
     }
+
+    // Extract and register table references for Intellisense
+    this.extractAndRegisterTableReferences([{ sql, statementIndex: 0 }]);
 
     // Generate run ID early so we can use it in catch blocks
     const runId = this.generateId();
@@ -728,6 +818,9 @@ export class SqlExecutor {
   async describeTable(uri: vscode.Uri, tableName: string) {
     // Generate the DESCRIBE statement
     const sql = `DESCRIBE ${tableName}`;
+
+    // Extract and register table references for Intellisense
+    this.extractAndRegisterTableReferences([{ sql, statementIndex: 0 }]);
 
     // Generate run ID early so we can use it in catch blocks
     const runId = this.generateId();
@@ -927,6 +1020,9 @@ export class SqlExecutor {
       vscode.window.showWarningMessage("No SQL statement found at position");
       return;
     }
+
+    // Extract and register table references for Intellisense
+    this.extractAndRegisterTableReferences([{ sql, statementIndex: 0 }]);
 
     // Generate run ID early so we can use it in catch blocks
     const runId = this.generateId();

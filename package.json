@@ -38,6 +38,14 @@
       {
         "command": "sqlRunner.copyStatement",
         "title": "Copy SQL Statement to Clipboard"
+      },
+      {
+        "command": "sqlRunner.refreshMetadata",
+        "title": "SQL Runner: Refresh Schema Metadata"
+      },
+      {
+        "command": "sqlRunner.showMetadataStats",
+        "title": "SQL Runner: Show Metadata Statistics"
       }
     ],
     "keybindings": [
@@ -77,8 +85,66 @@
           "type": "number",
           "default": 1000,
           "description": "Maximum number of rows to display in the result table. Set to 0 for unlimited rows."
+        },
+        "sqlRunner.intellisense.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable SQL Intellisense (autocomplete for schemas, tables, and columns)"
+        },
+        "sqlRunner.intellisense.defaultSchema": {
+          "type": "string",
+          "default": "ACCESS_VIEWS",
+          "description": "Default schema to use for unqualified table references"
+        },
+        "sqlRunner.intellisense.allowedSchemas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["ACCESS_VIEWS"],
+          "description": "List of schemas to track for Intellisense. Schemas are automatically added when referenced in executed queries."
+        },
+        "sqlRunner.intellisense.allowedTables": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "List of specific tables to track (format: 'schema.table'). Tables are automatically added when referenced in executed queries."
+        },
+        "sqlRunner.intellisense.autoExpandFromQueries": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically add schemas and tables to the allow-list when they are referenced in executed queries"
+        },
+        "sqlRunner.intellisense.autoRefreshIntervalMs": {
+          "type": "number",
+          "default": 3600000,
+          "description": "How often to refresh schema metadata in milliseconds (default: 1 hour)"
+        },
+        "sqlRunner.intellisense.requestThrottleMs": {
+          "type": "number",
+          "default": 500,
+          "description": "Minimum time between metadata refresh requests in milliseconds"
+        },
+        "sqlRunner.intellisense.maxTablesPerSchema": {
+          "type": "number",
+          "default": 1000,
+          "description": "Maximum number of tables to load per schema (to avoid overwhelming large schemas)"
         }
       }
+    },
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "sqlRunner.refreshMetadata",
+          "when": "editorLangId == sql"
+        },
+        {
+          "command": "sqlRunner.showMetadataStats",
+          "when": "editorLangId == sql"
+        }
+      ]
     }
   },
   "scripts": {

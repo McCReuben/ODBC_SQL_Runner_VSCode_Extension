@@ -4,13 +4,58 @@ import type { QueryError } from '../types';
 type ErrorDisplayProps = {
   error?: QueryError;
   legacyMessage?: string; // For backward compatibility
+  sql?: string; // The SQL statement that caused the error
 };
+
+/**
+ * Highlights the error location in SQL by showing the relevant lines and a caret pointer
+ */
+function highlightSqlError(sql: string, line: number, position: number): JSX.Element {
+  const lines = sql.split('\n');
+  
+  // Show context: 2 lines before and 2 lines after the error line (or less if near boundaries)
+  const errorLineIdx = line - 1; // Convert to 0-based index
+  const startLine = Math.max(0, errorLineIdx - 2);
+  const endLine = Math.min(lines.length - 1, errorLineIdx + 2);
+  
+  const contextLines = lines.slice(startLine, endLine + 1);
+  
+  return (
+    <div className="mt-3 p-3 bg-black/30 rounded border border-red-800/50">
+      <div className="text-xs text-red-400 font-medium mb-2">SQL with Error Location:</div>
+      <div className="text-xs font-mono overflow-x-auto">
+        {contextLines.map((lineText, idx) => {
+          const currentLineNum = startLine + idx + 1;
+          const isErrorLine = currentLineNum === line;
+          
+          return (
+            <div key={idx}>
+              <div className={`${isErrorLine ? 'text-red-300 bg-red-900/30' : 'text-gray-400'}`}>
+                <span className="inline-block w-8 text-right mr-3 select-none opacity-60">
+                  {currentLineNum}
+                </span>
+                <span className="text-red-200">{lineText || ' '}</span>
+              </div>
+              {isErrorLine && position > 0 && (
+                <div className="text-red-400">
+                  <span className="inline-block w-8 mr-3"></span>
+                  <span>{' '.repeat(position - 1)}^</span>
+                  <span className="ml-2 text-xs">└─ Error here</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 /**
  * Displays SQL query errors in a user-friendly format.
  * Shows a clean error message by default with an expandable section for full details.
  */
-export function ErrorDisplay({ error, legacyMessage }: ErrorDisplayProps) {
+export function ErrorDisplay({ error, legacyMessage, sql }: ErrorDisplayProps) {
   const [showFullError, setShowFullError] = useState(false);
   const [showTraceback, setShowTraceback] = useState(false);
 
@@ -62,14 +107,18 @@ export function ErrorDisplay({ error, legacyMessage }: ErrorDisplayProps) {
         {/* Structured Details */}
         {error.details && (
           <div className="mb-4 space-y-2">
-            {/* Location Information */}
-            {(error.details.line !== undefined || error.details.position !== undefined) && (
+            {/* Location Information with SQL Highlighting */}
+            {(error.details.line !== undefined && error.details.position !== undefined && sql) ? (
+              // Show SQL with error location highlighted
+              highlightSqlError(sql, error.details.line, error.details.position)
+            ) : (error.details.line !== undefined || error.details.position !== undefined) ? (
+              // Fallback to text-only location if SQL not available
               <div className="text-xs text-red-300">
                 <span className="text-red-400 font-medium">Location: </span>
                 {error.details.line !== undefined && `Line ${error.details.line}`}
                 {error.details.position !== undefined && `, Position ${error.details.position}`}
               </div>
-            )}
+            ) : null}
 
             {/* Column Suggestions */}
             {error.details.suggestions && error.details.suggestions.length > 0 && (

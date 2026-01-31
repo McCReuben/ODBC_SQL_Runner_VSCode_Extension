@@ -30,6 +30,14 @@
       {
         "command": "sqlRunner.exportResult",
         "title": "Export Query Result to CSV"
+      },
+      {
+        "command": "sqlRunner.selectStatement",
+        "title": "Select SQL Statement"
+      },
+      {
+        "command": "sqlRunner.copyStatement",
+        "title": "Copy SQL Statement to Clipboard"
       }
     ],
     "keybindings": [

@@ -50,10 +50,40 @@ export function activate(context: vscode.ExtensionContext) {
     },
   );
 
+  // Register command: Select SQL statement in editor (from CodeLens)
+  const selectStatementCommand = vscode.commands.registerCommand(
+    "sqlRunner.selectStatement",
+    async (uri: vscode.Uri, startOffset: number, endOffset: number) => {
+      const document = await vscode.workspace.openTextDocument(uri);
+      const editor = await vscode.window.showTextDocument(document);
+      const startPos = document.positionAt(startOffset);
+      const endPos = document.positionAt(endOffset);
+      editor.selection = new vscode.Selection(startPos, endPos);
+      editor.revealRange(
+        new vscode.Range(startPos, endPos),
+        vscode.TextEditorRevealType.InCenterIfOutsideViewport
+      );
+    },
+  );
+
+  // Register command: Copy SQL statement to clipboard (from CodeLens)
+  const copyStatementCommand = vscode.commands.registerCommand(
+    "sqlRunner.copyStatement",
+    async (uri: vscode.Uri, startOffset: number, endOffset: number) => {
+      const document = await vscode.workspace.openTextDocument(uri);
+      const text = document.getText();
+      const sql = text.substring(startOffset, endOffset).trim();
+      await vscode.env.clipboard.writeText(sql);
+      vscode.window.showInformationMessage("SQL copied to clipboard");
+    },
+  );
+
   context.subscriptions.push(executeCommand);
   context.subscriptions.push(executeStatementAtLineCommand);
   context.subscriptions.push(describeTableCommand);
   context.subscriptions.push(exportResultCommand);
+  context.subscriptions.push(selectStatementCommand);
+  context.subscriptions.push(copyStatementCommand);
 
   // Cleanup on deactivation
   context.subscriptions.push({

@@ -124,7 +124,12 @@ function splitStatementsWithLines(
     }
 
     // Track when we hit actual SQL content (non-whitespace, not in any comment)
-    if (inLeadingArea && !inLineComment && !inBlockComment && !/\s/.test(char)) {
+    if (
+      inLeadingArea &&
+      !inLineComment &&
+      !inBlockComment &&
+      !/\s/.test(char)
+    ) {
       contentStartOffset = i;
       inLeadingArea = false;
     }
@@ -340,8 +345,9 @@ export class SqlCodeLensProvider implements vscode.CodeLensProvider {
         normalizedSql.startsWith("SELECT") ||
         normalizedSql.startsWith("SHOW") ||
         normalizedSql.startsWith("DESCRIBE") ||
+        normalizedSql.startsWith("WITH") ||
         normalizedSql.startsWith("EXPLAIN");
-      if (true) {
+      if (isSelectQuery) {
         const exportCodeLens = new vscode.CodeLens(range, {
           title: "📁 Export CSV",
           tooltip: "Execute and export results to CSV",
@@ -350,6 +356,24 @@ export class SqlCodeLensProvider implements vscode.CodeLensProvider {
         });
         codeLenses.push(exportCodeLens);
       }
+
+      // "Select" button - highlights the SQL statement in the editor
+      const selectCodeLens = new vscode.CodeLens(range, {
+        title: "⬜ Select",
+        tooltip: "Select this SQL statement in the editor",
+        command: "sqlRunner.selectStatement",
+        arguments: [document.uri, stmt.startOffset, stmt.endOffset],
+      });
+      codeLenses.push(selectCodeLens);
+
+      // "Copy" button - copies the SQL statement to clipboard
+      const copyCodeLens = new vscode.CodeLens(range, {
+        title: "📋 Copy",
+        tooltip: "Copy this SQL statement to clipboard",
+        command: "sqlRunner.copyStatement",
+        arguments: [document.uri, stmt.startOffset, stmt.endOffset],
+      });
+      codeLenses.push(copyCodeLens);
     }
 
     return codeLenses;

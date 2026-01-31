@@ -245,7 +245,7 @@ export const ResultTable = forwardRef<ResultTableHandle, ResultTableProps>(
     }
 
     if (resultSet.status === 'error') {
-      return <ErrorDisplay error={resultSet.error} legacyMessage={resultSet.errorMessage} />;
+      return <ErrorDisplay error={resultSet.error} legacyMessage={resultSet.errorMessage} sql={resultSet.sql} />;
     }
 
     if (resultSet.status === 'cancelled') {

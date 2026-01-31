@@ -28,6 +28,10 @@
         "title": "Describe Table"
       },
       {
+        "command": "sqlRunner.describeTableAtCursor",
+        "title": "SQL Runner: Describe Table at Cursor"
+      },
+      {
         "command": "sqlRunner.exportResult",
         "title": "Export Query Result to CSV"
       },
@@ -128,6 +132,10 @@
     },
     "menus": {
       "commandPalette": [
+        {
+          "command": "sqlRunner.describeTableAtCursor",
+          "when": "editorLangId == sql"
+        },
         {
           "command": "sqlRunner.refreshMetadata",
           "when": "editorLangId == sql"

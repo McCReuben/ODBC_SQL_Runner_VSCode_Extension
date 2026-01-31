@@ -8,6 +8,10 @@ import { registerSqlCodeLens } from "./sqlCodeLens";
 import { SchemaMetadataStore } from "./schemaMetadata";
 import { MetadataWorker } from "./metadataWorker";
 import { registerSqlCompletionProvider } from "./sqlCompletionProvider";
+import {
+  registerSqlDefinitionProvider,
+  getTableNameAtCursor,
+} from "./sqlDefinitionProvider";
 
 let sqlExecutor: SqlExecutor;
 let metadataStore: SchemaMetadataStore;
@@ -31,10 +35,17 @@ export function activate(context: vscode.ExtensionContext) {
   const codeLensDisposable = registerSqlCodeLens(context);
   context.subscriptions.push(codeLensDisposable);
 
+  // Register Definition Provider for Option+Click / Cmd+Click on table names
+  const definitionProviderDisposable = registerSqlDefinitionProvider(context);
+  context.subscriptions.push(definitionProviderDisposable);
+
   // Register Intellisense completion provider (if enabled)
   const config = vscode.workspace.getConfiguration("sqlRunner.intellisense");
   if (config.get<boolean>("enabled", true)) {
-    const completionDisposable = registerSqlCompletionProvider(context, metadataStore);
+    const completionDisposable = registerSqlCompletionProvider(
+      context,
+      metadataStore,
+    );
     context.subscriptions.push(completionDisposable);
     console.log("SQL Intellisense enabled");
 
@@ -60,11 +71,33 @@ export function activate(context: vscode.ExtensionContext) {
     },
   );
 
-  // Register command: Describe table (from CodeLens)
+  // Register command: Describe table (from CodeLens or Definition Provider)
   const describeTableCommand = vscode.commands.registerCommand(
     "sqlRunner.describeTable",
     async (uri: vscode.Uri, tableName: string) => {
       await sqlExecutor.describeTable(uri, tableName);
+    },
+  );
+
+  // Register command: Describe table at cursor position (keyboard shortcut)
+  const describeTableAtCursorCommand = vscode.commands.registerCommand(
+    "sqlRunner.describeTableAtCursor",
+    async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) {
+        vscode.window.showErrorMessage("No active editor");
+        return;
+      }
+
+      const tableName = getTableNameAtCursor();
+      if (!tableName) {
+        vscode.window.showWarningMessage(
+          "No table name found at cursor position"
+        );
+        return;
+      }
+
+      await sqlExecutor.describeTable(editor.document.uri, tableName);
     },
   );
 
@@ -87,7 +120,7 @@ export function activate(context: vscode.ExtensionContext) {
       editor.selection = new vscode.Selection(startPos, endPos);
       editor.revealRange(
         new vscode.Range(startPos, endPos),
-        vscode.TextEditorRevealType.InCenterIfOutsideViewport
+        vscode.TextEditorRevealType.InCenterIfOutsideViewport,
       );
     },
   );
@@ -112,7 +145,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage("Refreshing schema metadata...");
         metadataWorker.forceRefreshAll();
       }
-    }
+    },
   );
 
   // Register command: Show metadata statistics
@@ -126,12 +159,12 @@ export function activate(context: vscode.ExtensionContext) {
 
         vscode.window.showInformationMessage(
           `Metadata: ${stats.totalSchemas} schemas, ${stats.totalTables} tables (${stats.tablesWithColumns} with columns). ` +
-          `Configured: ${stats.schemasToScan} schemas to scan, ${stats.configuredTables} specific tables. ` +
-          `Auto-discovered: ${stats.autoDiscoveredSchemas} schemas, ${stats.autoDiscoveredTables} tables. ` +
-          `Worker: ${workerState}, Queue: ${queueLength}`
+            `Configured: ${stats.schemasToScan} schemas to scan, ${stats.configuredTables} specific tables. ` +
+            `Auto-discovered: ${stats.autoDiscoveredSchemas} schemas, ${stats.autoDiscoveredTables} tables. ` +
+            `Worker: ${workerState}, Queue: ${queueLength}`,
         );
       }
-    }
+    },
   );
 
   // Register command: Edit schemas config file
@@ -141,7 +174,7 @@ export function activate(context: vscode.ExtensionContext) {
       if (metadataStore) {
         await metadataStore.openSchemasFile();
       }
-    }
+    },
   );
 
   // Register command: Edit tables config file
@@ -151,12 +184,13 @@ export function activate(context: vscode.ExtensionContext) {
       if (metadataStore) {
         await metadataStore.openTablesFile();
       }
-    }
+    },
   );
 
   context.subscriptions.push(executeCommand);
   context.subscriptions.push(executeStatementAtLineCommand);
   context.subscriptions.push(describeTableCommand);
+  context.subscriptions.push(describeTableAtCursorCommand);
   context.subscriptions.push(exportResultCommand);
   context.subscriptions.push(selectStatementCommand);
   context.subscriptions.push(copyStatementCommand);

@@ -14,6 +14,7 @@ export interface PythonMessage {
 export interface ExecuteRequest {
   sql: string;
   resultSetId: string;
+  maxRows?: number;
 }
 
 export interface ErrorDetails {
@@ -52,6 +53,7 @@ interface QueuedQuery {
   resolve: (result: ExecuteResult) => void;
   reject: (error: Error) => void;
   onStarted?: () => void;
+  maxRows?: number;
 }
 
 export class PythonRunner {
@@ -246,13 +248,14 @@ export class PythonRunner {
   async executeQuery(
     sql: string, 
     resultSetId: string,
-    onStarted?: () => void
+    onStarted?: () => void,
+    maxRows?: number
   ): Promise<ExecuteResult> {
     await this.readyPromise;
 
     return new Promise((resolve, reject) => {
       // Add to queue
-      this.queryQueue.push({ sql, resultSetId, resolve, reject, onStarted });
+      this.queryQueue.push({ sql, resultSetId, resolve, reject, onStarted, maxRows });
       
       // Process queue if not already processing
       this.processQueryQueue();
@@ -287,6 +290,7 @@ export class PythonRunner {
         type: "EXECUTE",
         sql: query.sql,
         resultSetId: query.resultSetId,
+        maxRows: query.maxRows,
       });
 
       // DEBUG: Log the parsed result

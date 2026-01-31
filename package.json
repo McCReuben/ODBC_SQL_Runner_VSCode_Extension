@@ -72,6 +72,11 @@
           "type": "string",
           "default": "",
           "description": "Directory to export query results to CSV. If empty, exports to the same directory as the SQL file."
+        },
+        "sqlRunner.maxDisplayRows": {
+          "type": "number",
+          "default": 1000,
+          "description": "Maximum number of rows to display in the result table. Set to 0 for unlimited rows."
         }
       }
     }

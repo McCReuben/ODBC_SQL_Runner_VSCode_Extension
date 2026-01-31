@@ -198,6 +198,10 @@ export class SqlExecutor {
               });
 
               try {
+                // Get max rows setting
+                const config = vscode.workspace.getConfiguration("sqlRunner");
+                const maxRows = config.get<number>("maxDisplayRows", 1000);
+
                 // Execute the query with onStarted callback
                 // The callback will be invoked when the query actually starts (not just queued)
                 const result = await session.executeQuery(
@@ -214,6 +218,7 @@ export class SqlExecutor {
                       stmt.sql,
                     );
                   },
+                  maxRows,
                 );
 
                 // DEBUG: Log the result received by SqlExecutor

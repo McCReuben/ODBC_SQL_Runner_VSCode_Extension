@@ -167,8 +167,14 @@ class SqlExecutorMock:
 
         self.connection.commit()
 
-    def execute_query(self, sql: str, result_set_id: str) -> Dict[str, Any]:
-        """Execute a single SQL statement and return results"""
+    def execute_query(self, sql: str, result_set_id: str, max_rows: int = 0) -> Dict[str, Any]:
+        """Execute a single SQL statement and return results
+        
+        Args:
+            sql: SQL query to execute
+            result_set_id: Unique identifier for this result set
+            max_rows: Maximum number of rows to return (0 = unlimited)
+        """
         if not self.connection or not self.cursor:
             return {
                 "success": False,
@@ -217,15 +223,21 @@ class SqlExecutorMock:
                 for col in self.cursor.description
             ]
 
-            # Fetch all rows
+            # Fetch rows with limit
             rows = []
+            row_count = 0
             for row in self.cursor:
+                # Check if we've reached the limit
+                if max_rows > 0 and row_count >= max_rows:
+                    break
+                
                 row_dict = {}
                 for key in row.keys():
                     value = row[key]
                     # SQLite data is already JSON-serializable
                     row_dict[key] = value
                 rows.append(row_dict)
+                row_count += 1
 
             execution_time_ms = int((time.time() - start_time) * 1000)
 
@@ -343,8 +355,9 @@ def main():
 
                     sql = command.get("sql", "")
                     result_set_id = command.get("resultSetId", "")
+                    max_rows = command.get("maxRows", 0)  # 0 means unlimited
 
-                    result = executor.execute_query(sql, result_set_id)
+                    result = executor.execute_query(sql, result_set_id, max_rows)
                     send_message({
                         "type": "EXECUTE_RESULT",
                         "payload": result

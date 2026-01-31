@@ -296,8 +296,14 @@ class SqlExecutor:
                     print(f"[DEBUG] Heartbeat failed: {str(e)}", file=sys.stderr)
                     # Don't break - keep trying
 
-    def execute_query(self, sql: str, result_set_id: str) -> Dict[str, Any]:
-        """Execute a single SQL statement and return results"""
+    def execute_query(self, sql: str, result_set_id: str, max_rows: int = 0) -> Dict[str, Any]:
+        """Execute a single SQL statement and return results
+        
+        Args:
+            sql: SQL query to execute
+            result_set_id: Unique identifier for this result set
+            max_rows: Maximum number of rows to return (0 = unlimited)
+        """
         if not self.connection or not self.cursor:
             return {
                 "success": False,
@@ -338,9 +344,14 @@ class SqlExecutor:
                     for col in self.cursor.description
                 ]
 
-                # Fetch all rows
+                # Fetch rows with limit
                 rows = []
+                row_count = 0
                 for row in self.cursor:
+                    # Check if we've reached the limit
+                    if max_rows > 0 and row_count >= max_rows:
+                        break
+                    
                     row_dict = {}
                     for i, col in enumerate(self.cursor.description):
                         value = row[i]
@@ -354,6 +365,7 @@ class SqlExecutor:
                                 value = value.isoformat()
                         row_dict[col[0]] = value
                     rows.append(row_dict)
+                    row_count += 1
 
             execution_time_ms = int((time.time() - start_time) * 1000)
 
@@ -483,8 +495,9 @@ def main():
 
                     sql = command.get("sql", "")
                     result_set_id = command.get("resultSetId", "")
+                    max_rows = command.get("maxRows", 0)  # 0 means unlimited
 
-                    result = executor.execute_query(sql, result_set_id)
+                    result = executor.execute_query(sql, result_set_id, max_rows)
                     
                     # DEBUG: Log the result before sending
                     print(f"[DEBUG] Sending EXECUTE_RESULT for resultSetId={result_set_id}", file=sys.stderr)

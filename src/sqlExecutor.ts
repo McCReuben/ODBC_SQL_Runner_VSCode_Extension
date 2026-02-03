@@ -18,7 +18,7 @@ export class SqlExecutor {
   private runningQueries: Map<string, string> = new Map(); // runId -> fileUri
   private runningResultSets: Map<string, Set<string>> = new Map(); // runId -> Set<resultSetId>
   private cancelledRuns: Set<string> = new Set(); // Track cancelled runIds
-  private queryCounter: number = 0; // Incremental counter for query numbers
+  private queryCounters: Map<string, number> = new Map(); // fileUri -> session-based query counter
   private defaultSchema: string = "ACCESS_VIEWS";
 
   constructor(context: vscode.ExtensionContext, metadataStore?: SchemaMetadataStore) {
@@ -154,13 +154,13 @@ export class SqlExecutor {
             }
 
             // Send RUN_STARTED message
-            this.queryCounter++;
+            const queryNumber = this.getNextQueryNumber(fileUri);
             const sqlPreview = this.getSqlPreview(statements);
             this.webviewManager.sendRunStarted(
               fileUri,
               runId,
               sqlPreview,
-              `Query ${this.queryCounter}`,
+              `Query ${queryNumber}`,
             );
 
             // Send RESULT_SET_PENDING for all statements upfront to create tabs immediately
@@ -425,6 +425,8 @@ export class SqlExecutor {
       const result = await this.sessionManager.reconnectSession(fileUri);
 
       if (result.success) {
+        // Reset query counter for this session
+        this.resetQueryCounter(fileUri);
         // Notify webview of success
         this.webviewManager.sendReconnectSuccess(fileUri, result.message);
       } else {
@@ -465,6 +467,9 @@ export class SqlExecutor {
     try {
       // Close the session
       await this.sessionManager.closeSession(fileUri);
+
+      // Reset query counter for this session
+      this.resetQueryCounter(fileUri);
 
       // Notify webview of successful disconnection
       this.webviewManager.sendDisconnectSuccess(
@@ -693,12 +698,12 @@ export class SqlExecutor {
             }
 
             // Send RUN_STARTED message
-            this.queryCounter++;
+            const queryNumber = this.getNextQueryNumber(fileUri);
             this.webviewManager.sendRunStarted(
               fileUri,
               runId,
               sql,
-              `Query ${this.queryCounter}`
+              `Query ${queryNumber}`
             );
 
             const resultSetId = `${runId}-rs-0`;
@@ -889,7 +894,6 @@ export class SqlExecutor {
             }
 
             // Send RUN_STARTED message
-            this.queryCounter++;
             this.webviewManager.sendRunStarted(
               fileUri,
               runId,
@@ -1123,12 +1127,12 @@ export class SqlExecutor {
             }
 
             // Send RUN_STARTED message
-            this.queryCounter++;
+            const queryNumber = this.getNextQueryNumber(fileUri);
             this.webviewManager.sendRunStarted(
               fileUri,
               runId,
               sql,
-              `Export ${this.queryCounter}`
+              `Export ${queryNumber}`
             );
 
             const resultSetId = `${runId}-rs-0`;
@@ -1311,6 +1315,23 @@ export class SqlExecutor {
     );
 
     return [header, ...dataRows].join("\n");
+  }
+
+  /**
+   * Get and increment the query counter for a specific session
+   */
+  private getNextQueryNumber(fileUri: string): number {
+    const current = this.queryCounters.get(fileUri) || 0;
+    const next = current + 1;
+    this.queryCounters.set(fileUri, next);
+    return next;
+  }
+
+  /**
+   * Reset the query counter for a specific session
+   */
+  private resetQueryCounter(fileUri: string): void {
+    this.queryCounters.delete(fileUri);
   }
 
   /**

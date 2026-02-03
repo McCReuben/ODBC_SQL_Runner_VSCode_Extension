@@ -218,8 +218,9 @@ class SparkErrorParser:
 
 
 class SqlExecutor:
-    def __init__(self, dsn: str):
+    def __init__(self, dsn: str, session_id: Optional[str] = None):
         self.dsn = dsn
+        self.session_id = session_id or "unknown"  # Identifies which file/session this belongs to
         self.connection: Optional[pyodbc.Connection] = None
         self.cursor: Optional[pyodbc.Cursor] = None
         
@@ -273,14 +274,14 @@ class SqlExecutor:
         self.heartbeat_stop_event.clear()
         self.heartbeat_thread = threading.Thread(target=self._heartbeat_worker, daemon=True)
         self.heartbeat_thread.start()
-        print(f"[DEBUG] Heartbeat thread started (interval: {self.heartbeat_interval}s)", file=sys.stderr)
+        print(f"[DEBUG] [{self.session_id}] Heartbeat thread started (interval: {self.heartbeat_interval}s)", file=sys.stderr)
     
     def _stop_heartbeat(self):
         """Stop the heartbeat thread"""
         if self.heartbeat_thread and self.heartbeat_thread.is_alive():
             self.heartbeat_stop_event.set()
             self.heartbeat_thread.join(timeout=5)
-            print("[DEBUG] Heartbeat thread stopped", file=sys.stderr)
+            print(f"[DEBUG] [{self.session_id}] Heartbeat thread stopped", file=sys.stderr)
     
     def _heartbeat_worker(self):
         """Background worker that sends keepalive queries"""
@@ -302,23 +303,29 @@ class SqlExecutor:
                             # Consume the result to complete the query
                             self.cursor.fetchall()
                             self.last_activity_time = time.time()
-                            print(f"[DEBUG] Heartbeat sent (idle for {time_since_last_activity:.1f}s)", file=sys.stderr)
+                            print(f"[DEBUG] [{self.session_id}] Heartbeat sent (idle for {time_since_last_activity:.1f}s)", file=sys.stderr)
                 except Exception as e:
                     error_str = str(e)
-                    print(f"[DEBUG] Heartbeat failed: {error_str}", file=sys.stderr)
+                    print(f"[DEBUG] [{self.session_id}] Heartbeat failed: {error_str}", file=sys.stderr)
                     
-                    # Check if this is the "No more data to read" error
-                    if "No more data to read" in error_str:
-                        print("[DEBUG] Detected 'No more data to read' error in heartbeat, attempting reconnection...", file=sys.stderr)
+                    # Check if this is a connection error that requires reconnection
+                    needs_reconnect = (
+                        "No more data to read" in error_str or
+                        "client disconnected" in error_str or
+                        "SSL_write: Broken pipe" in error_str
+                    )
+                    
+                    if needs_reconnect:
+                        print(f"[DEBUG] [{self.session_id}] Detected connection error in heartbeat, attempting reconnection...", file=sys.stderr)
                         try:
                             # Attempt to reconnect
                             reconnect_result = self.reconnect()
                             if reconnect_result.get("success"):
-                                print("[DEBUG] Heartbeat reconnection successful", file=sys.stderr)
+                                print(f"[DEBUG] [{self.session_id}] Heartbeat reconnection successful", file=sys.stderr)
                             else:
-                                print(f"[DEBUG] Heartbeat reconnection failed: {reconnect_result.get('error')}", file=sys.stderr)
+                                print(f"[DEBUG] [{self.session_id}] Heartbeat reconnection failed: {reconnect_result.get('error')}", file=sys.stderr)
                         except Exception as reconnect_error:
-                            print(f"[DEBUG] Heartbeat reconnection exception: {str(reconnect_error)}", file=sys.stderr)
+                            print(f"[DEBUG] [{self.session_id}] Heartbeat reconnection exception: {str(reconnect_error)}", file=sys.stderr)
                     # Don't break - keep trying
 
     def execute_query(self, sql: str, result_set_id: str, max_rows: int = 0) -> Dict[str, Any]:
@@ -441,9 +448,15 @@ class SqlExecutor:
             error_str = str(e)
             full_traceback = traceback.format_exc()
             
-            # Check for "No more data to read" error - this means we need to reconnect
-            if "No more data to read" in error_str and retry_count == 0:
-                print(f"[DEBUG] Detected 'No more data to read' error, attempting automatic reconnection...", file=sys.stderr)
+            # Check for connection errors that require reconnection
+            needs_reconnect = (
+                "No more data to read" in error_str or
+                "client disconnected" in error_str or
+                "SSL_write: Broken pipe" in error_str
+            )
+            
+            if needs_reconnect and retry_count == 0:
+                print(f"[DEBUG] Detected connection error, attempting automatic reconnection...", file=sys.stderr)
                 reconnect_result = self.reconnect()
                 
                 if reconnect_result.get("success"):
@@ -588,7 +601,8 @@ def main():
 
                 if command_type == "CONNECT":
                     dsn = command.get("dsn", "Hermes")
-                    executor = SqlExecutor(dsn)
+                    session_id = command.get("sessionId")  # Optional session identifier (filename)
+                    executor = SqlExecutor(dsn, session_id)
                     result = executor.connect()
                     send_message({
                         "type": "CONNECT_RESULT",

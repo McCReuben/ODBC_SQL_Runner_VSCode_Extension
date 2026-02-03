@@ -88,6 +88,12 @@ export class SqlCompletionProvider implements vscode.CompletionItemProvider {
       return null;
     }
 
+    // Check if IntelliSense is enabled (allows runtime toggling via settings)
+    const config = vscode.workspace.getConfiguration("sqlRunner.intellisense");
+    if (!config.get<boolean>("enabled", true)) {
+      return null;
+    }
+
     const items: vscode.CompletionItem[] = [];
     
     // Get text up to cursor

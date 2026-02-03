@@ -136,11 +136,10 @@ export function StatusBar({
             {onReconnect && (
               <button
                 onClick={onReconnect}
-                className="flex items-center gap-1.5 px-2 py-0.5 text-[10px] bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                className="p-1 rounded hover:bg-blue-600 text-white transition-colors"
                 title="Reconnect to database"
               >
                 <ReconnectIcon />
-                <span>Reconnect</span>
               </button>
             )}
             
@@ -148,11 +147,10 @@ export function StatusBar({
             {(connectionStatus === 'connected' || connectionStatus === 'error') && onDisconnect && (
               <button
                 onClick={onDisconnect}
-                className="flex items-center gap-1.5 px-2 py-0.5 text-[10px] bg-transparent hover:bg-red-600 text-white rounded transition-colors"
+                className="p-1 rounded hover:bg-red-600 text-white transition-colors"
                 title="Disconnect from database"
               >
                 <DisconnectIcon />
-                <span>Disconnect</span>
               </button>
             )}
           </>
@@ -206,30 +204,37 @@ function formatNumber(n: number): string {
 }
 
 function ReconnectIcon() {
+  // Refresh/sync icon - circular arrows
   return (
     <svg
-      width="12"
-      height="12"
+      width="14"
+      height="14"
       viewBox="0 0 16 16"
       fill="currentColor"
+      className="opacity-70 hover:opacity-100"
     >
-      <path d="M8 1a7 7 0 0 0-7 7h1a6 6 0 0 1 6-6V1zm0 14a7 7 0 0 0 7-7h-1a6 6 0 0 1-6 6v1z" />
-      <path d="M4.5 8.5L3 7l-1.5 1.5L0 7l3-3 3 3-1.5 1.5L3 7l1.5 1.5z" />
-      <path d="M11.5 7.5L13 9l1.5-1.5L16 9l-3 3-3-3 1.5-1.5L13 9l-1.5-1.5z" />
+      <path d="M13.5 8c0-3.033-2.467-5.5-5.5-5.5-1.983 0-3.717 1.05-4.684 2.625L4 4.5V1H3v5h5V5H4.874c.782-1.288 2.196-2.25 3.876-2.25 2.481 0 4.5 2.019 4.5 4.5h1.25z" />
+      <path d="M2.5 8c0 3.033 2.467 5.5 5.5 5.5 1.983 0 3.717-1.05 4.684-2.625L12 11.5V15h1v-5H8v1h3.126c-.782 1.288-2.196 2.25-3.876 2.25-2.481 0-4.5-2.019-4.5-4.5H1.5z" />
     </svg>
   );
 }
 
 function DisconnectIcon() {
+  // Plug unplugged / broken connection icon
   return (
     <svg
-      width="12"
-      height="12"
+      width="14"
+      height="14"
       viewBox="0 0 16 16"
       fill="currentColor"
+      className="opacity-70 hover:opacity-100"
     >
-      <path d="M11 3h2v10h-2V3zM3 3h2v10H3V3z" />
-      <path d="M2 2h12v1H2V2zm0 11h12v1H2v-1z" />
+      {/* Left plug part */}
+      <path d="M2 4h2v2H2V4zm0 4h2v2H2V8zm3-3h2v6H5V5z" />
+      {/* Right plug part (separated) */}
+      <path d="M12 4h2v2h-2V4zm0 4h2v2h-2V8zm-2-3h2v6h-2V5z" />
+      {/* Diagonal line indicating disconnection */}
+      <path d="M1.5 14.5L14.5 1.5l-.7-.7-13 13 .7.7z" opacity="0.8" />
     </svg>
   );
 }

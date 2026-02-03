@@ -123,16 +123,32 @@ export function App() {
   // Check if the active run has any running results
   const isQueryRunning = activeRun?.status === 'running';
 
-  // Handle ESC key to close modal
+  // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // ESC to close modal
       if (e.key === 'Escape' && showSqlModal) {
         setShowSqlModal(false);
+      }
+      
+      // Cmd+A or Cmd+Shift+C to copy whole table to clipboard
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const cmdKey = isMac ? e.metaKey : e.ctrlKey;
+      
+      if (cmdKey && (e.key === 'a' || e.key === 'A' || (e.shiftKey && (e.key === 'c' || e.key === 'C')))) {
+        // Only handle if we have a result table and it's not in a text input
+        const target = e.target as HTMLElement;
+        const isInInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+        
+        if (!isInInput && activeResultSet && activeResultSet.rows.length > 0) {
+          e.preventDefault();
+          handleCopyTable();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showSqlModal]);
+  }, [showSqlModal, activeResultSet, handleCopyTable]);
 
   // Show connection status overlay if connecting or error
   const showConnectionOverlay = state.connectionStatus === 'connecting' || state.connectionStatus === 'error';

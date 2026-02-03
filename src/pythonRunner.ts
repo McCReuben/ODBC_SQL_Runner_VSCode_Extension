@@ -78,7 +78,7 @@ export class PythonRunner {
     });
   }
 
-  async start(dsn: string): Promise<void> {
+  async start(dsn: string, sessionId?: string): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
         // Spawn the Python process
@@ -110,8 +110,8 @@ export class PythonRunner {
 
         // Wait for ready message
         this.readyPromise.then(() => {
-          // Send connect command
-          this.sendCommand({ type: "CONNECT", dsn })
+          // Send connect command with optional session identifier
+          this.sendCommand({ type: "CONNECT", dsn, sessionId })
             .then((result) => {
               if (result.payload?.success) {
                 resolve();
@@ -424,8 +424,11 @@ export class SessionManager {
 
     session = new PythonRunner(pythonPath, scriptPath);
 
+    // Extract filename from URI for session identification in logs
+    const sessionId = fileUri.split('/').pop() || fileUri;
+
     try {
-      await session.start(dsn);
+      await session.start(dsn, sessionId);
       this.sessions.set(fileUri, session);
       return session;
     } catch (error) {

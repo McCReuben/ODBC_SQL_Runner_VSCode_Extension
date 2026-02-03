@@ -32,21 +32,18 @@ export function activate(context: vscode.ExtensionContext) {
   const codeLensDisposable = registerSqlCodeLens(context);
   context.subscriptions.push(codeLensDisposable);
 
-  // Register Intellisense completion provider (if enabled)
-  const config = vscode.workspace.getConfiguration("sqlRunner.intellisense");
-  if (config.get<boolean>("enabled", true)) {
-    const completionDisposable = registerSqlCompletionProvider(
-      context,
-      metadataStore,
-    );
-    context.subscriptions.push(completionDisposable);
-    console.log("SQL Intellisense enabled");
+  // Register Intellisense completion provider (always registered, but checks setting at runtime)
+  const completionDisposable = registerSqlCompletionProvider(
+    context,
+    metadataStore,
+  );
+  context.subscriptions.push(completionDisposable);
+  console.log("SQL Intellisense provider registered (toggle via sqlRunner.intellisense.enabled setting)");
 
-    // Start metadata worker in the background
-    metadataWorker.start().catch((error) => {
-      console.error("Failed to start metadata worker:", error);
-    });
-  }
+  // Start metadata worker in the background (needed for IntelliSense)
+  metadataWorker.start().catch((error) => {
+    console.error("Failed to start metadata worker:", error);
+  });
 
   // Register command: Execute query (Cmd+Enter or from CodeLens)
   const executeCommand = vscode.commands.registerCommand(

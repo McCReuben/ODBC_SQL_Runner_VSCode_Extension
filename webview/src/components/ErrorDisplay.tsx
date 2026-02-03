@@ -62,10 +62,10 @@ export function ErrorDisplay({ error, legacyMessage, sql }: ErrorDisplayProps) {
   // Handle legacy error format
   if (!error && legacyMessage) {
     return (
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 max-w-2xl w-full">
+      <div className="flex-1 flex flex-col p-4 overflow-auto">
+        <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 max-w-2xl w-full mx-auto">
           <div className="text-red-400 font-medium mb-2">Query Error</div>
-          <div className="text-sm text-red-300 font-mono whitespace-pre-wrap">
+          <div className="text-sm text-red-300 font-mono whitespace-pre-wrap max-h-[60vh] overflow-y-auto">
             {legacyMessage}
           </div>
         </div>
@@ -75,8 +75,8 @@ export function ErrorDisplay({ error, legacyMessage, sql }: ErrorDisplayProps) {
 
   if (!error) {
     return (
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 max-w-2xl w-full">
+      <div className="flex-1 flex flex-col p-4 overflow-auto">
+        <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 max-w-2xl w-full mx-auto">
           <div className="text-red-400 font-medium mb-2">Query Error</div>
           <div className="text-sm text-red-300">An unknown error occurred</div>
         </div>
@@ -87,8 +87,8 @@ export function ErrorDisplay({ error, legacyMessage, sql }: ErrorDisplayProps) {
   const hasFullError = Boolean(error.rawError || error.traceback);
 
   return (
-    <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
-      <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 max-w-2xl w-full">
+    <div className="flex-1 flex flex-col p-4 overflow-auto">
+      <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 max-w-2xl w-full mx-auto max-h-[80vh] overflow-y-auto">
         {/* Error Type Badge */}
         {error.type && (
           <div className="flex items-center gap-2 mb-3">

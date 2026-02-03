@@ -367,13 +367,10 @@ export class SqlExecutor {
             // Send RUN_COMPLETE
             this.webviewManager.sendRunComplete(fileUri, runId);
 
+            // Only show warning for failed batches, not success notifications
             if (batchFailed) {
               vscode.window.showWarningMessage(
                 `Batch execution stopped due to error. Some downstream queries were cancelled.`,
-              );
-            } else {
-              vscode.window.showInformationMessage(
-                `Executed ${statements.length} statement${statements.length > 1 ? "s" : ""}`,
               );
             }
           } catch (error: any) {
@@ -430,9 +427,6 @@ export class SqlExecutor {
       if (result.success) {
         // Notify webview of success
         this.webviewManager.sendReconnectSuccess(fileUri, result.message);
-        vscode.window.showInformationMessage(
-          result.message || "Successfully reconnected to database",
-        );
       } else {
         // Notify webview of error
         this.webviewManager.sendReconnectError(
@@ -477,10 +471,6 @@ export class SqlExecutor {
         fileUri,
         "Successfully disconnected from database",
       );
-
-      vscode.window.showInformationMessage(
-        "Successfully disconnected from database",
-      );
     } catch (error: any) {
       // Notify webview of disconnection error
       this.webviewManager.sendDisconnectError(
@@ -523,10 +513,6 @@ export class SqlExecutor {
 
       // Then send run cancelled message
       this.webviewManager.sendRunCancelled(fileUri, runId);
-
-      vscode.window.showInformationMessage(
-        "Query cancelled. Database session remains active.",
-      );
     } catch (error: any) {
       console.error("[SqlExecutor] Failed to cancel query:", error);
       vscode.window.showErrorMessage(
@@ -811,7 +797,6 @@ export class SqlExecutor {
 
             // Send RUN_COMPLETE
             this.webviewManager.sendRunComplete(fileUri, runId);
-            vscode.window.showInformationMessage("Executed 1 statement");
           } catch (error: any) {
             this.webviewManager.sendRunError(
               fileUri,
@@ -1008,9 +993,6 @@ export class SqlExecutor {
 
             // Send RUN_COMPLETE
             this.webviewManager.sendRunComplete(fileUri, runId);
-            vscode.window.showInformationMessage(
-              `Described table: ${tableName}`
-            );
           } catch (error: any) {
             this.webviewManager.sendRunError(
               fileUri,

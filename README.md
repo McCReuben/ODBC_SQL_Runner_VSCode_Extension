@@ -1,8 +1,8 @@
-# SQL Runner - VS Code Extension
+# Hermes SQL Runner - VS Code Extension
 
 Execute SQL queries with **Cmd+Enter** and view results in an interactive table with live aggregations, sorting, and multi-cell selection.
 
-![SQL Runner Demo](https://via.placeholder.com/800x450/1e1e1e/ffffff?text=SQL+Runner+Extension)
+![Hermes SQL Runner Demo](https://via.placeholder.com/800x450/1e1e1e/ffffff?text=Hermes+SQL+Runner+Extension)
 
 ## Features
 

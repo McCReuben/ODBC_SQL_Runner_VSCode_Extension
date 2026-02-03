@@ -1,5 +1,5 @@
 /**
- * SQL Runner Extension - Main Entry Point
+ * Hermes SQL Runner Extension - Main Entry Point
  */
 
 import * as vscode from "vscode";
@@ -15,7 +15,7 @@ let metadataStore: SchemaMetadataStore;
 let metadataWorker: MetadataWorker;
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log("SQL Runner extension is now active");
+  console.log("Hermes SQL Runner extension is now active");
 
   // Initialize schema metadata store
   metadataStore = new SchemaMetadataStore(context);

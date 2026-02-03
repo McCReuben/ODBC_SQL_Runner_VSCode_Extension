@@ -1,4 +1,4 @@
--- SQL Runner Extension - Mock Database Examples
+-- Hermes SQL Runner Extension - Mock Database Examples
 -- These examples work with the in-memory SQLite database (useMockDatabase: true)
 -- Press Cmd+Enter (Mac) or Ctrl+Enter (Win/Linux) to execute
 

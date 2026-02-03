@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-Get up and running with the SQL Runner extension in 5 minutes.
+Get up and running with the Hermes SQL Runner extension in 5 minutes.
 
 ## Option A: Quick Test with Mock Database (No ODBC Required)
 

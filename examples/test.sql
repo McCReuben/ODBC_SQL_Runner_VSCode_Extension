@@ -1,4 +1,4 @@
--- SQL Runner Extension - Test Examples
+-- Hermes SQL Runner Extension - Test Examples
 -- Place cursor on any line and press Cmd+Enter (Mac) or Ctrl+Enter (Win/Linux)
 -- Example 1: Simple SELECT
 SELECT 1 as id,

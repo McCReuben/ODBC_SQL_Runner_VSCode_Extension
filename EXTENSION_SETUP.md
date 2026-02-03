@@ -1,4 +1,4 @@
-# SQL Runner Extension - Setup Guide
+# Hermes SQL Runner Extension - Setup Guide
 
 A VS Code extension for executing SQL queries via ODBC and displaying results in an interactive webview table.
 
@@ -102,11 +102,11 @@ npm run watch
 Configure the extension in VS Code settings:
 
 1. Open Settings (Cmd+, or Ctrl+,)
-2. Search for "SQL Runner"
+2. Search for "Hermes SQL Runner"
 3. Configure:
-   - **SQL Runner: Use Mock Database** - Use SQLite mock instead of ODBC (default: false)
-   - **SQL Runner: ODBC DSN** - Your ODBC Data Source Name (default: "Hermes")
-   - **SQL Runner: Python Path** - Path to Python executable (default: "python3")
+   - **Hermes SQL Runner: Use Mock Database** - Use SQLite mock instead of ODBC (default: false)
+   - **Hermes SQL Runner: ODBC DSN** - Your ODBC Data Source Name (default: "Hermes")
+   - **Hermes SQL Runner: Python Path** - Path to Python executable (default: "python3")
 
 Or edit `.vscode/settings.json`:
 

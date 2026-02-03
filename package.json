@@ -1,6 +1,6 @@
 {
   "name": "sql-runner-extension",
-  "displayName": "SQL Runner",
+  "displayName": "Hermes SQL Runner",
   "description": "Execute SQL queries with Cmd+Enter and view results in an interactive table",
   "version": "0.0.1",
   "repository": {
@@ -33,7 +33,7 @@
       },
       {
         "command": "sqlRunner.describeTableAtCursor",
-        "title": "SQL Runner: Describe Table at Cursor"
+        "title": "Hermes SQL Runner: Describe Table at Cursor"
       },
       {
         "command": "sqlRunner.exportResult",
@@ -49,19 +49,19 @@
       },
       {
         "command": "sqlRunner.refreshMetadata",
-        "title": "SQL Runner: Refresh Schema Metadata"
+        "title": "Hermes SQL Runner: Refresh Schema Metadata"
       },
       {
         "command": "sqlRunner.showMetadataStats",
-        "title": "SQL Runner: Show Metadata Statistics"
+        "title": "Hermes SQL Runner: Show Metadata Statistics"
       },
       {
         "command": "sqlRunner.editSchemasConfig",
-        "title": "SQL Runner: Edit Schemas to Scan"
+        "title": "Hermes SQL Runner: Edit Schemas to Scan"
       },
       {
         "command": "sqlRunner.editTablesConfig",
-        "title": "SQL Runner: Edit Tables to Include"
+        "title": "Hermes SQL Runner: Edit Tables to Include"
       }
     ],
     "keybindings": [
@@ -83,7 +83,7 @@
       }
     ],
     "configuration": {
-      "title": "SQL Runner",
+      "title": "Hermes SQL Runner",
       "properties": {
         "sqlRunner.odbcDsn": {
           "type": "string",

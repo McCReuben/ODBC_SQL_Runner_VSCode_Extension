@@ -3,6 +3,10 @@
   "displayName": "SQL Runner",
   "description": "Execute SQL queries with Cmd+Enter and view results in an interactive table",
   "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/McCReuben/ODBC_SQL_Runner_VSCode_Extension"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },

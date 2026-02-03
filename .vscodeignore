@@ -12,3 +12,11 @@ webview/src/**
 webview/node_modules/**
 webview/*.config.*
 webview/tsconfig.json
+.venv/**
+venv/**
+**/__pycache__/**
+**/*.pyc
+test.ipynb
+Errors.py
+.git/**
+.DS_Store

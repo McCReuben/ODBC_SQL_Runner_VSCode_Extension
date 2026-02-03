@@ -11,6 +11,7 @@ A VS Code extension for executing SQL queries via ODBC and displaying results in
 ## Mock Database Mode (Recommended for Testing)
 
 The extension includes a mock SQLite database mode that requires no ODBC setup. This is perfect for:
+
 - Testing the extension without configuring ODBC
 - Development and debugging
 - Demonstrations
@@ -30,15 +31,15 @@ Add to your settings (`.vscode/settings.json` or VS Code Settings UI):
 
 The mock database automatically creates these tables:
 
-| Table | Columns | Description |
-|-------|---------|-------------|
-| `people` | id, name, age, email, department | Employee data (10 rows) |
-| `products` | id, name, category, price, stock | Product catalog (10 rows) |
-| `sales` | id, product_id, quantity, sale_date, revenue | Sales transactions (10 rows) |
-| `DW_SITES` | site_id, site_name, region, active | Site information (5 rows) |
-| `active_sites` | (view) | View of active sites only |
+| Table          | Columns                                      | Description                  |
+| -------------- | -------------------------------------------- | ---------------------------- |
+| `people`       | id, name, age, email, department             | Employee data (10 rows)      |
+| `products`     | id, name, category, price, stock             | Product catalog (10 rows)    |
+| `sales`        | id, product_id, quantity, sale_date, revenue | Sales transactions (10 rows) |
+| `DW_SITES`     | site_id, site_name, region, active           | Site information (5 rows)    |
+| `active_sites` | (view)                                       | View of active sites only    |
 
-See [examples/test_mock.sql](examples/test_mock.sql) for ready-to-run examples.
+See examples/test_mock.sql for ready-to-run examples.
 
 ## Installation Steps
 

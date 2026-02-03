@@ -75,11 +75,11 @@ Each `.sql` file maintains its own database connection/session.
 
 ## Configuration
 
-| Setting | Description | Default |
-|---------|-------------|---------|
-| `sqlRunner.useMockDatabase` | Use SQLite mock (no ODBC) | `false` |
-| `sqlRunner.odbcDsn` | ODBC Data Source Name | `"Hermes"` |
-| `sqlRunner.pythonPath` | Path to Python executable | `"python3"` |
+| Setting                     | Description               | Default     |
+| --------------------------- | ------------------------- | ----------- |
+| `sqlRunner.useMockDatabase` | Use SQLite mock (no ODBC) | `false`     |
+| `sqlRunner.odbcDsn`         | ODBC Data Source Name     | `"Hermes"`  |
+| `sqlRunner.pythonPath`      | Path to Python executable | `"python3"` |
 
 ## Mock Database
 
@@ -160,19 +160,23 @@ cd webview && npm run build -- --watch
 ## Troubleshooting
 
 ### "Connection failed"
+
 - **Mock mode**: Ensure Python 3 is installed (sqlite3 is built-in)
 - **ODBC mode**: Test with `python3 -c "import pyodbc; pyodbc.connect('DSN=YourDSN')"`
 
 ### "Webview not built"
+
 ```bash
 cd webview && npm install && npm run build
 ```
 
 ### No results showing
+
 - Check Debug Console (View → Debug Console) for errors
 - Verify Python stderr output
 
 ### Temp tables not persisting
+
 - Ensure executing from same file (each file = one session)
 
 ## Known Limitations
@@ -192,6 +196,7 @@ This is an internal development tool. For issues or suggestions, update the GitH
 ## Credits
 
 Built with:
+
 - [Tabulator](http://tabulator.info/) - Interactive table library
 - [pyodbc](https://github.com/mkleehammer/pyodbc) - ODBC database access
 - [React](https://react.dev/) - UI framework
